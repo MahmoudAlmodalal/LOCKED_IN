@@ -18,14 +18,18 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            // By default, associate the task with a new user.
-            // This can be overridden in the test.
+            // By default, the creator and the user are the same.
+            // We create a closure so that user_id is set first.
             'user_id' => User::factory(),
-            'title' => $this->faker->sentence(4), // A fake sentence with 4 words
-            'description' => $this->faker->paragraph(2), // A fake paragraph with 2 sentences
+            'creator_id' => function (array $attributes) {
+                return $attributes['user_id'];
+            },
+            'title' => $this->faker->sentence(4),
+            'description' => $this->faker->paragraph(2),
             'priority' => $this->faker->randomElement(['Low', 'Medium', 'High']),
             'status' => $this->faker->randomElement(['To Do', 'In Progress', 'Done']),
-            'deadline' => $this->faker->dateTimeBetween('+1 week', '+1 month'), // A fake date in the future
+            'deadline' => $this->faker->dateTimeBetween('+1 week', '+1 month'),
         ];
     }
+
 }

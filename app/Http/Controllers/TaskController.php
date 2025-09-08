@@ -39,31 +39,46 @@ class TaskController extends Controller
     /**
      * Store a newly created task in storage for the authenticated user.
      */
-        public function store(Request $request)
-        {
-            // Get the authenticated user
-            $user = $request->user();
+    public function store(Request $request)
+    {
+        // Get the authenticated user
+        $user = $request->user();
 
-            // Validate the incoming request data
-            $validatedData = $request->validate([
-                'title' => 'required|string|max:255',
-                'description' => 'nullable|string',
-                'priority' => 'nullable|in:Low,Medium,High',
-                'status' => 'nullable|in:To Do,In Progress,Done',
-                'deadline' => 'nullable|date',
-                'category_id' => 'nullable|exists:categories,id',
-            ]);
+        // Validate the incoming request data
+        $validatedData = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'nullable|in:Low,Medium,High',
+            'status' => 'nullable|in:To Do,In Progress,Done',
+            'deadline' => 'nullable|date',
+            'category_id' => 'nullable|exists:categories,id',
+            // Add user_id to validation. It's optional.
+            'user_id' => 'nullable|exists:users,id'
+        ]);
 
-            // **The Fix: Add the creator_id to the data before creating the task.**
-            // For now, the creator is always the authenticated user.
-            $validatedData['creator_id'] = $user->id;
+        // --- AUTHORIZATION LOGIC ---
+        $assigneeId = $validatedData['user_id'] ?? $user->id;
 
-            // Create the task. The `$user->tasks()` part automatically sets the `user_id`.
-            // The `create()` method will use the `creator_id` we just added.
-            $task = $user->tasks()->create($validatedData);
-
-            return response()->json($task, 201); // 201 Created
+        // Check if a user is being assigned the task
+        if ($assigneeId !== $user->id) {
+            // If so, only allow it if the authenticated user is a Task Manager or Admin
+            if ($user->role !== 'Task Manager' && $user->role !== 'Admin') {
+                return response()->json(['message' => 'You do not have permission to assign tasks to other users.'], 403);
+            }
         }
+
+        // --- DATA PREPARATION ---
+        // The creator is always the authenticated user
+        $validatedData['creator_id'] = $user->id;
+        // The owner (user_id) is the assignee, or the creator if no assignee is specified
+        $validatedData['user_id'] = $assigneeId;
+
+        // Create the task with the prepared data
+        $task = Task::create($validatedData);
+
+        return response()->json($task, 201);
+    }
+
 
 
     /**
@@ -84,9 +99,16 @@ class TaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
-        // Authorization: Ensure the authenticated user owns this task
-        if (Auth::id() !== $task->user_id) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        // Get the authenticated user
+        $user = $request->user();
+
+        // Authorization: First, ensure the user can access this task at all.
+        // For now, we'll stick with the owner check. A better solution would be a Policy.
+        if ($user->id !== $task->user_id && $user->id !== $task->creator_id) {
+             // Allow if user is the owner OR the creator (manager)
+            if ($user->role !== 'Admin') { // Or some other logic for team visibility
+                 return response()->json(['message' => 'Forbidden'], 403);
+            }
         }
 
         // Validate the incoming request data
@@ -97,13 +119,24 @@ class TaskController extends Controller
             'status' => 'nullable|in:To Do,In Progress,Done',
             'deadline' => 'nullable|date',
             'category_id' => 'nullable|exists:categories,id',
+            'user_id' => 'sometimes|required|exists:users,id'
         ]);
+
+        // --- AUTHORIZATION LOGIC FOR RE-ASSIGNMENT ---
+        // Check if the task is being re-assigned
+        if (isset($validatedData['user_id']) && $validatedData['user_id'] !== $task->user_id) {
+            // Only allow re-assignment if the authenticated user is a Task Manager or Admin
+            if ($user->role !== 'Task Manager' && $user->role !== 'Admin') {
+                return response()->json(['message' => 'You do not have permission to re-assign tasks.'], 403);
+            }
+        }
 
         // Update the task with the validated data
         $task->update($validatedData);
 
         return response()->json($task);
     }
+
 
     /**
      * Remove the specified task from storage, if it belongs to the user.
