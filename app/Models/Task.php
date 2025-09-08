@@ -21,6 +21,7 @@ class Task extends Model
         'description',
         'priority',
         'status',
+        'creator_id',
         'deadline',
     ];
 
@@ -46,6 +47,10 @@ class Task extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
     }
 
 }
