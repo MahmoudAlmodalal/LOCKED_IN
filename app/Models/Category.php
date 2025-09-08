@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Task extends Model
+class Category extends Model
 {
     use HasFactory;
 
@@ -17,35 +18,22 @@ class Task extends Model
      */
     protected $fillable = [
         'user_id',
-        'title',
-        'description',
-        'priority',
-        'status',
-        'deadline',
+        'name',
     ];
 
     /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'deadline' => 'datetime',
-    ];
-
-    /**
-     * Get the user that owns the task.
+     * Get the user that owns the category.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-        /**
-     * Get the category that the task belongs to.
-     */
-    public function category(): BelongsTo
-    {
-        return $this->belongsTo(Category::class);
-    }
 
+    /**
+     * Get the tasks for the category.
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
 }
