@@ -39,24 +39,32 @@ class TaskController extends Controller
     /**
      * Store a newly created task in storage for the authenticated user.
      */
-    public function store(Request $request)
-    {
-        $user = $request->user();
-        // Validate the incoming request data
-        $validatedData = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'priority' => 'nullable|in:Low,Medium,High',
-            'status' => 'nullable|in:To Do,In Progress,Done',
-            'deadline' => 'nullable|date',
-            'category_id' => 'nullable|exists:categories,id', // Ensure the category exists
-        ]);
+        public function store(Request $request)
+        {
+            // Get the authenticated user
+            $user = $request->user();
 
-        // Create the task and associate it with the authenticated user
-        $task = $user->tasks()->create($validatedData);
+            // Validate the incoming request data
+            $validatedData = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'priority' => 'nullable|in:Low,Medium,High',
+                'status' => 'nullable|in:To Do,In Progress,Done',
+                'deadline' => 'nullable|date',
+                'category_id' => 'nullable|exists:categories,id',
+            ]);
 
-        return response()->json($task, 201); // 201 Created
-    }
+            // **The Fix: Add the creator_id to the data before creating the task.**
+            // For now, the creator is always the authenticated user.
+            $validatedData['creator_id'] = $user->id;
+
+            // Create the task. The `$user->tasks()` part automatically sets the `user_id`.
+            // The `create()` method will use the `creator_id` we just added.
+            $task = $user->tasks()->create($validatedData);
+
+            return response()->json($task, 201); // 201 Created
+        }
+
 
     /**
      * Display the specified task, if it belongs to the user.
