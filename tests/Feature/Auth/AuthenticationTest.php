@@ -3,12 +3,16 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase; // Resets the database for each test
+// 1. REMOVE the old trait
+// use Illuminate\Foundation\Testing\RefreshDatabase;
+
+// 2. IMPORT and USE the new, more robust trait
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
 {
-    use RefreshDatabase;
+    use LazilyRefreshDatabase; // 3. USE the new trait here
 
     /**
      * Test: A new user can successfully register.
@@ -22,15 +26,16 @@ class AuthenticationTest extends TestCase
             'password_confirmation' => 'Password123!',
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        // The URL does not need the '/api' prefix in tests
+        $response = $this->postJson('/register', $userData);
 
         $response
-            ->assertStatus(201) // Assert "Created" status
-            ->assertJsonStructure(['message', 'user', 'access_token']); // Assert response structure
+            ->assertStatus(201)
+            ->assertJsonStructure(['message', 'user', 'access_token']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'test@example.com',
-        ]); // Assert user exists in the database
+        ]);
     }
 
     /**
@@ -49,7 +54,7 @@ class AuthenticationTest extends TestCase
             'password_confirmation' => 'Password123!',
         ];
 
-        $response = $this->postJson('/api/register', $userData);
+        $response = $this->postJson('/register', $userData);
 
         $response
             ->assertStatus(422) // Assert "Unprocessable Entity" status for validation failure
@@ -71,7 +76,7 @@ class AuthenticationTest extends TestCase
             'password' => 'Password123!',
         ];
 
-        $response = $this->postJson('/api/login', $loginData);
+        $response = $this->postJson('/login', $loginData);
 
         $response
             ->assertStatus(200) // Assert "OK" status
@@ -90,7 +95,7 @@ class AuthenticationTest extends TestCase
             'password' => 'wrong-password',
         ];
 
-        $response = $this->postJson('/api/login', $loginData);
+        $response = $this->postJson('/login', $loginData);
 
         $response
             ->assertStatus(401) // Assert "Unauthorized" status
