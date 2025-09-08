@@ -20,6 +20,9 @@ return new class extends Migration
         $table->enum('status', ['To Do', 'In Progress', 'Done'])->default('To Do');
         $table->timestamp('deadline')->nullable();
         $table->timestamps(); // Creates `created_at` and `updated_at`
+        // Inside the Schema::create('tasks', ...) block
+        $table->foreignId('category_id')->nullable()->constrained()->onDelete('set null');
+
     });
 }
     /**
