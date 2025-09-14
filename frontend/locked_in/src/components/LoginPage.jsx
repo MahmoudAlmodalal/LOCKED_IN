@@ -1,57 +1,78 @@
+// src/components/LoginPage.jsx
+
 import React, { useState } from 'react';
+import axiosClient from '../api/axiosClient'; // <-- 1. Import the new client
+import { useNavigate } from 'react-router-dom'; // <-- Import for redirection
 
 const LoginPage = () => {
-  // Create state variables to hold the values of the input fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState(null); // State for login errors
+  const navigate = useNavigate(); // Hook for programmatic navigation
 
-  // This function will be called when the form is submitted
-  const handleLogin = (event) => {
-    // preventDefault stops the browser from refreshing the page on form submission
+  const handleLogin = async (event) => {
     event.preventDefault();
+    setError(null); // Clear previous errors
 
-    // For now, we'll just log the data to the console.
-    // In a future task, you would send this data to your backend API.
-    console.log('Login attempt with:');
-    console.log('Email:', email);
-    console.log('Password:', password);
+    try {
+      // 2. Use axiosClient to make the API call
+      const response = await axiosClient.post('/login', {
+        email: email,
+        password: password,
+      });
 
-    // Here you would typically make an API call:
-    // e.g., axios.post('/api/login', { email, password });
+      // 3. Assuming the API returns a token in `response.data.access_token`
+      const token = response.data.access_token;
+      if (token) {
+        // 4. Save the token to local storage
+        localStorage.setItem('authToken', token);
+        
+        console.log('Login successful! Token saved.');
+
+        // 5. Redirect the user to the tasks page
+        navigate('/tasks');
+      }
+
+    } catch (err) {
+      console.error('Login failed:', err);
+      // Assuming the API returns a 401 with an error message
+      setError('Login failed. Please check your credentials.');
+      // Clear the token if login fails
+      localStorage.removeItem('authToken');
+    }
   };
 
   return (
-    <div style={{ width: '300px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
+    <div style={{ width: '300px', margin: '50px auto', /* ... other styles */ }}>
       <h2>Login</h2>
       <form onSubmit={handleLogin}>
-        {/* Email Field */}
+        {/* Display error message if login fails */}
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        
+        {/* ... rest of the form (email and password fields) ... */}
         <div style={{ marginBottom: '15px' }}>
           <label htmlFor="email">Email Address</label>
           <input
             type="email"
             id="email"
-            value={email} // Bind the input's value to our state variable
-            onChange={(e) => setEmail(e.target.value)} // Update the state on every keystroke
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>
-
-        {/* Password Field */}
         <div style={{ marginBottom: '15px' }}>
           <label htmlFor="password">Password</label>
           <input
             type="password"
             id="password"
-            value={password} // Bind the input's value to our state variable
-            onChange={(e) => setPassword(e.target.value)} // Update the state on every keystroke
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>
-
-        {/* Submit Button */}
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}>
+        <button type="submit" style={{ width: '100%', padding: '10px', /* ... other styles */ }}>
           Login
         </button>
       </form>
