@@ -3,13 +3,13 @@
 import React from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 
-// Import your page components
+// Import your components
 import LoginPage from './components/LoginPage.jsx';
 import RegisterPage from './components/RegisterPage.jsx';
 import TaskList from './components/TaskList.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx'; // <-- 1. Import
 import './App.css';
 
-// A simple component for the home page
 const HomePage = () => (
   <div>
     <h2>Welcome to Locked In!</h2>
@@ -17,31 +17,52 @@ const HomePage = () => (
   </div>
 );
 
+// A simple component for a 404 Not Found page
+const NotFound = () => <h2>404 - Page Not Found</h2>;
+
 function App() {
+  // We can add a simple logout button for testing
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    // You might want to redirect to login page as well
+    window.location.href = '/login'; // Simple redirect
+  };
+
+  const token = localStorage.getItem('authToken');
+
   return (
     <div className="App">
-      {/* --- Navigation Bar --- */}
       <nav style={{ padding: '1rem', backgroundColor: '#282c34', marginBottom: '2rem' }}>
         <Link to="/" style={{ color: 'white', marginRight: '1rem' }}>Home</Link>
         <Link to="/tasks" style={{ color: 'white', marginRight: '1rem' }}>Tasks</Link>
-        <Link to="/login" style={{ color: 'white', marginRight: '1rem' }}>Login</Link>
-        <Link to="/register" style={{ color: 'white' }}>Register</Link>
+        {!token ? (
+          <>
+            <Link to="/login" style={{ color: 'white', marginRight: '1rem' }}>Login</Link>
+            <Link to="/register" style={{ color: 'white' }}>Register</Link>
+          </>
+        ) : (
+          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: 'cyan', cursor: 'pointer' }}>
+            Logout
+          </button>
+        )}
       </nav>
 
-      {/* --- Route Definitions --- */}
       <main>
         <Routes>
-          {/* When the URL is "/", show the HomePage component */}
+          {/* --- Public Routes --- */}
           <Route path="/" element={<HomePage />} />
-          
-          {/* When the URL is "/tasks", show the TaskList component */}
-          <Route path="/tasks" element={<TaskList />} />
-
-          {/* When the URL is "/login", show the LoginPage component */}
           <Route path="/login" element={<LoginPage />} />
-
-          {/* When the URL is "/register", show the RegisterPage component */}
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* --- Protected Routes --- */}
+          {/* All routes nested under ProtectedRoute will require authentication */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/tasks" element={<TaskList />} />
+            {/* You can add more protected routes here, e.g., /profile, /settings */}
+          </Route>
+
+          {/* --- Catch-all for 404 Not Found --- */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
