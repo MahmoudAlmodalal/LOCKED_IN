@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import { apiClient } from './api';
 import { User, UserRole, LoginForm, RegisterForm } from './types';
 
 export interface AuthState {
@@ -84,71 +84,25 @@ class AuthService {
     try {
       const { email, password } = credentials;
       
-      // Find user by email
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return { success: false, message: 'User not found' };
+      const response = await apiClient.login(email, password);
+      
+      // Store token
+      if (response.access_token) {
+        localStorage.setItem('auth_token', response.access_token);
       }
 
-      // Check if user is active
-      if (!user.isActive) {
-        return { success: false, message: 'Account is deactivated' };
-      }
-
-      // Check password (in real app, this would be hashed)
-      if (user.password !== password) {
-        return { success: false, message: 'Invalid password' };
-      }
-
-      // Update last login time
-      await storage.updateUser(user.id, { updatedAt: new Date() });
-
-      // Set current user
-      this.currentUser = user;
-      this.saveUserToStorage(user);
-      this.notifyListeners();
-
-      return { success: true, user };
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, message: 'An error occurred during login' };
-    }
-  }
-
-  // Register new user
-  public async register(userData: RegisterForm): Promise<{ success: boolean; message?: string; user?: User }> {
-    try {
-      const { username, email, password, confirmPassword } = userData;
-
-      // Validate input
-      if (password !== confirmPassword) {
-        return { success: false, message: 'Passwords do not match' };
-      }
-
-      if (password.length < 8) {
-        return { success: false, message: 'Password must be at least 8 characters long' };
-      }
-
-      if (username.length < 3) {
-        return { success: false, message: 'Username must be at least 3 characters long' };
-      }
-
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return { success: false, message: 'User with this email already exists' };
-      }
-
-      // Create new user
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        username,
-        email,
-        password, // In real app, this would be hashed
+      // Get user data
+      const userData = await apiClient.getUser();
+      
+      const user: User = {
+        id: userData.id.toString(),
+        username: userData.name,
+        email: userData.email,
+        password: '', // Don't store password
         role: UserRole.END_USER,
         isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date(userData.created_at),
+        updatedAt: new Date(userData.updated_at),
         preferences: {
           theme: 'light',
           language: 'en',
@@ -172,25 +126,100 @@ class AuthService {
         }
       };
 
-      await storage.createUser(newUser);
+      this.currentUser = user;
+      this.saveUserToStorage(user);
+      this.notifyListeners();
 
-      // Auto-login after registration
+      return { success: true, user };
+    } catch (error: any) {
+      console.error('Login error:', error);
+      return { success: false, message: error.message || 'An error occurred during login' };
+    }
+  }
+
+  // Register new user
+  public async register(userData: RegisterForm): Promise<{ success: boolean; message?: string; user?: User }> {
+    try {
+      const { username, email, password, confirmPassword } = userData;
+
+      // Validate input
+      if (password !== confirmPassword) {
+        return { success: false, message: 'Passwords do not match' };
+      }
+
+      if (password.length < 8) {
+        return { success: false, message: 'Password must be at least 8 characters long' };
+      }
+
+      if (username.length < 3) {
+        return { success: false, message: 'Username must be at least 3 characters long' };
+      }
+
+      const response = await apiClient.register(username, email, password, confirmPassword);
+      
+      // Store token
+      if (response.access_token) {
+        localStorage.setItem('auth_token', response.access_token);
+      }
+
+      // Get user data
+      const userResponse = await apiClient.getUser();
+      
+      const newUser: User = {
+        id: userResponse.id.toString(),
+        username: userResponse.name,
+        email: userResponse.email,
+        password: '',
+        role: UserRole.END_USER,
+        isActive: true,
+        createdAt: new Date(userResponse.created_at),
+        updatedAt: new Date(userResponse.updated_at),
+        preferences: {
+          theme: 'light',
+          language: 'en',
+          timezone: 'UTC',
+          notifications: {
+            email: true,
+            push: true,
+            reminders: true,
+            deadlines: true,
+            habits: true
+          },
+          pomodoroSettings: {
+            workDuration: 25,
+            shortBreakDuration: 5,
+            longBreakDuration: 15,
+            longBreakInterval: 4,
+            autoStartBreaks: false,
+            autoStartPomodoros: false,
+            soundEnabled: true
+          }
+        }
+      };
+
       this.currentUser = newUser;
       this.saveUserToStorage(newUser);
       this.notifyListeners();
 
       return { success: true, user: newUser };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      return { success: false, message: 'An error occurred during registration' };
+      return { success: false, message: error.message || 'An error occurred during registration' };
     }
   }
 
   // Logout user
   public async logout(): Promise<void> {
-    this.currentUser = null;
-    this.saveUserToStorage(null);
-    this.notifyListeners();
+    try {
+      await apiClient.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      this.currentUser = null;
+      this.saveUserToStorage(null);
+      this.notifyListeners();
+    }
   }
 
   // Get current user
@@ -307,40 +336,28 @@ class AuthService {
         throw new Error('No user logged in');
       }
 
-      const tasks = await storage.getTasks(this.currentUser.id);
-      const habits = await storage.getHabits(this.currentUser.id);
-      const pomodoroSessions = await storage.getPomodoroSessions(this.currentUser.id);
-
+      const tasks = await apiClient.getTasks();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - today.getDay());
 
       return {
         tasks: {
           total: tasks.length,
-          completed: tasks.filter(task => task.status === 'completed').length,
-          overdue: tasks.filter(task => 
-            task.dueDate && 
-            task.dueDate < today && 
+          completed: tasks.filter((task: any) => task.status === 'completed').length,
+          overdue: tasks.filter((task: any) => 
+            task.due_date && 
+            new Date(task.due_date) < today && 
             task.status !== 'completed'
           ).length
         },
         habits: {
-          total: habits.length,
-          active: habits.filter(habit => habit.isActive).length,
-          streak: Math.max(...habits.map(habit => habit.streak), 0)
+          total: 0,
+          active: 0,
+          streak: 0
         },
         pomodoros: {
-          today: pomodoroSessions.filter(session => {
-            const sessionDate = new Date(session.startTime);
-            sessionDate.setHours(0, 0, 0, 0);
-            return sessionDate.getTime() === today.getTime();
-          }).length,
-          thisWeek: pomodoroSessions.filter(session => 
-            new Date(session.startTime) >= weekStart
-          ).length
+          today: 0,
+          thisWeek: 0
         }
       };
     } catch (error) {
