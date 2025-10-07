@@ -1,31 +1,32 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { authService, AuthState } from './auth';
-import { storage } from './storage';
+import { apiClient } from './api';
 import { RegisterForm } from './types';
-import { 
-  User, 
-  Task, 
-  Category, 
-  Habit, 
-  HabitEntry, 
-  CalendarEvent, 
-  PomodoroSession, 
+import {
+  User,
+  Task,
+  Category,
+  Habit,
+  HabitEntry,
+  CalendarEvent,
+  PomodoroSession,
   Notification,
   TaskPriority,
-  TaskStatus,
   HabitFrequency,
   EventType,
   EventSourceType,
   PomodoroType,
-  NotificationType
+  NotificationType,
 } from './types';
 
-// Auth Hook
+// -----------------------------
+// AUTH HOOK
+// -----------------------------
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: true
+    isLoading: true,
   });
 
   useEffect(() => {
@@ -59,11 +60,13 @@ export function useAuth() {
     register,
     logout,
     updateProfile,
-    changePassword
+    changePassword,
   };
 }
 
-// Tasks Hook
+// -----------------------------
+// TASKS HOOK
+// -----------------------------
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +74,29 @@ export function useTasks() {
 
   const loadTasks = useCallback(async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
-      const userTasks = await storage.getTasks(user.id);
-      setTasks(userTasks);
+      const apiTasks = await apiClient.getTasks();
+      const transformedTasks = apiTasks.map((task: any) => ({
+        id: task.id.toString(),
+        userId: task.user_id.toString(),
+        title: task.title,
+        description: task.description,
+        status: task.status?.toLowerCase().replace(' ', '_') || 'todo',
+        priority: task.priority?.toLowerCase() || 'medium',
+        categoryId: task.category_id?.toString(),
+        dueDate: task.deadline ? new Date(task.deadline) : undefined,
+        estimatedTime: task.estimated_time,
+        actualTime: task.actual_time,
+        progress: task.progress || 0,
+        labels: task.labels || [],
+        createdAt: new Date(task.created_at),
+        updatedAt: new Date(task.updated_at),
+        subtasks: [],
+        attachments: [],
+        reminders: []
+      }));
+      setTasks(transformedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {
@@ -87,78 +108,48 @@ export function useTasks() {
     loadTasks();
   }, [loadTasks]);
 
-  const createTask = useCallback(async (taskData: {
-    title: string;
-    description?: string;
-    categoryId?: string;
-    priority: TaskPriority;
-    dueDate?: Date;
-    estimatedTime?: number;
-    labels?: string[];
-  }) => {
-    if (!user) return null;
-
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      ...taskData,
-      status: TaskStatus.TODO,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      userId: user.id,
-      labels: taskData.labels || [],
-      progress: 0,
-      subtasks: [],
-      attachments: [],
-      reminders: []
-    };
-
+  const createTask = useCallback(async (taskData: any) => {
+    if (!user) return;
     try {
-      const createdTask = await storage.createTask(newTask);
-      setTasks(prev => [...prev, createdTask]);
-      return createdTask;
+      const apiTaskData = {
+        title: taskData.title,
+        description: taskData.description,
+        status: 'To Do',
+        priority: taskData.priority === 'urgent' ? 'High' : taskData.priority.charAt(0).toUpperCase() + taskData.priority.slice(1),
+        category_id: taskData.categoryId || null,
+        deadline: taskData.dueDate ? taskData.dueDate.toISOString().split('T')[0] : null
+      };
+      await apiClient.createTask(apiTaskData);
+      await loadTasks();
     } catch (error) {
       console.error('Error creating task:', error);
-      return null;
     }
-  }, [user]);
+  }, [user, loadTasks]);
 
-  const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
+  const updateTask = useCallback(async (id: string, updates: any) => {
     try {
-      const updatedTask = await storage.updateTask(id, updates);
-      if (updatedTask) {
-        setTasks(prev => prev.map(task => task.id === id ? updatedTask : task));
-      }
-      return updatedTask;
+      await apiClient.updateTask(id, updates);
+      await loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      return null;
     }
-  }, []);
+  }, [loadTasks]);
 
   const deleteTask = useCallback(async (id: string) => {
     try {
-      const success = await storage.deleteTask(id);
-      if (success) {
-        setTasks(prev => prev.filter(task => task.id !== id));
-      }
-      return success;
+      await apiClient.deleteTask(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (error) {
       console.error('Error deleting task:', error);
-      return false;
     }
   }, []);
 
-  return {
-    tasks,
-    loading,
-    createTask,
-    updateTask,
-    deleteTask,
-    refreshTasks: loadTasks
-  };
+  return { tasks, loading, createTask, updateTask, deleteTask, refreshTasks: loadTasks };
 }
 
-// Categories Hook
+// -----------------------------
+// CATEGORIES HOOK
+// -----------------------------
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,11 +157,21 @@ export function useCategories() {
 
   const loadCategories = useCallback(async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
-      const userCategories = await storage.getCategories(user.id);
-      setCategories(userCategories);
+      const apiCategories = await apiClient.getCategories();
+      const transformedCategories = apiCategories.map((category: any) => ({
+        id: category.id.toString(),
+        userId: category.user_id.toString(),
+        name: category.name,
+        description: category.description,
+        color: category.color || 'blue',
+        icon: category.icon,
+        createdAt: new Date(category.created_at),
+        updatedAt: new Date(category.updated_at),
+        taskCount: 0
+      }));
+      setCategories(transformedCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -182,70 +183,39 @@ export function useCategories() {
     loadCategories();
   }, [loadCategories]);
 
-  const createCategory = useCallback(async (categoryData: {
-    name: string;
-    description?: string;
-    color: string;
-    icon?: string;
-  }) => {
-    if (!user) return null;
-
-    const newCategory: Category = {
-      id: `cat-${Date.now()}`,
-      ...categoryData,
-      userId: user.id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      taskCount: 0
-    };
-
+  const createCategory = useCallback(async (data: any) => {
     try {
-      const createdCategory = await storage.createCategory(newCategory);
-      setCategories(prev => [...prev, createdCategory]);
-      return createdCategory;
+      await apiClient.createCategory(data);
+      await loadCategories();
     } catch (error) {
       console.error('Error creating category:', error);
-      return null;
     }
-  }, [user]);
+  }, [loadCategories]);
 
-  const updateCategory = useCallback(async (id: string, updates: Partial<Category>) => {
+  const updateCategory = useCallback(async (id: string, data: any) => {
     try {
-      const updatedCategory = await storage.updateCategory(id, updates);
-      if (updatedCategory) {
-        setCategories(prev => prev.map(cat => cat.id === id ? updatedCategory : cat));
-      }
-      return updatedCategory;
+      await apiClient.updateCategory(id, data);
+      await loadCategories();
     } catch (error) {
       console.error('Error updating category:', error);
-      return null;
     }
-  }, []);
+  }, [loadCategories]);
 
   const deleteCategory = useCallback(async (id: string) => {
     try {
-      const success = await storage.deleteCategory(id);
-      if (success) {
-        setCategories(prev => prev.filter(cat => cat.id !== id));
-      }
-      return success;
+      await apiClient.deleteCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
-      return false;
     }
   }, []);
 
-  return {
-    categories,
-    loading,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    refreshCategories: loadCategories
-  };
+  return { categories, loading, createCategory, updateCategory, deleteCategory, refreshCategories: loadCategories };
 }
 
-// Habits Hook
+// -----------------------------
+// HABITS HOOK (Replaced storage)
+// -----------------------------
 export function useHabits() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,10 +223,9 @@ export function useHabits() {
 
   const loadHabits = useCallback(async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
-      const userHabits = await storage.getHabits(user.id);
+      const userHabits = await apiClient.getHabits();
       setHabits(userHabits);
     } catch (error) {
       console.error('Error loading habits:', error);
@@ -269,76 +238,133 @@ export function useHabits() {
     loadHabits();
   }, [loadHabits]);
 
-  const createHabit = useCallback(async (habitData: {
-    title: string;
-    description?: string;
-    frequency: HabitFrequency;
-    target: number;
-    unit: string;
-    color: string;
-    icon?: string;
-  }) => {
-    if (!user) return null;
-
-    const newHabit: Habit = {
-      id: `habit-${Date.now()}`,
-      ...habitData,
-      userId: user.id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-      streak: 0,
-      bestStreak: 0,
-      totalCompletions: 0
-    };
-
+  const createHabit = useCallback(async (habitData: any) => {
     try {
-      const createdHabit = await storage.createHabit(newHabit);
-      setHabits(prev => [...prev, createdHabit]);
-      return createdHabit;
+      await apiClient.createHabit(habitData);
+      await loadHabits();
     } catch (error) {
       console.error('Error creating habit:', error);
-      return null;
     }
-  }, [user]);
+  }, [loadHabits]);
 
-  const updateHabit = useCallback(async (id: string, updates: Partial<Habit>) => {
+  const updateHabit = useCallback(async (id: string, updates: any) => {
     try {
-      const updatedHabit = await storage.updateHabit(id, updates);
-      if (updatedHabit) {
-        setHabits(prev => prev.map(habit => habit.id === id ? updatedHabit : habit));
-      }
-      return updatedHabit;
+      await apiClient.updateHabit(id, updates);
+      await loadHabits();
     } catch (error) {
       console.error('Error updating habit:', error);
-      return null;
     }
-  }, []);
+  }, [loadHabits]);
 
   const deleteHabit = useCallback(async (id: string) => {
     try {
-      const success = await storage.deleteHabit(id);
-      if (success) {
-        setHabits(prev => prev.filter(habit => habit.id !== id));
-      }
-      return success;
+      await apiClient.deleteHabit(id);
+      setHabits((prev) => prev.filter((h) => h.id !== id));
     } catch (error) {
       console.error('Error deleting habit:', error);
-      return false;
     }
   }, []);
 
-  return {
-    habits,
-    loading,
-    createHabit,
-    updateHabit,
-    deleteHabit,
-    refreshHabits: loadHabits
-  };
+  return { habits, loading, createHabit, updateHabit, deleteHabit, refreshHabits: loadHabits };
 }
 
-// Habit Entries Hook
+// -----------------------------
+// POMODORO SESSIONS HOOK
+// -----------------------------
+export function usePomodoroSessions() {
+  const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const loadSessions = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const userSessions = await apiClient.getPomodoroSessions();
+      setSessions(userSessions);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  const createSession = useCallback(async (data: any) => {
+    try {
+      await apiClient.createPomodoroSession(data);
+      await loadSessions();
+    } catch (error) {
+      console.error('Error creating session:', error);
+    }
+  }, [loadSessions]);
+
+  const deleteSession = useCallback(async (id: string) => {
+    try {
+      await apiClient.deletePomodoroSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    }
+  }, []);
+
+  return { sessions, loading, createSession, deleteSession, refreshSessions: loadSessions };
+}
+
+// -----------------------------
+// NOTIFICATIONS HOOK
+// -----------------------------
+export function useNotifications() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const loadNotifications = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const userNotifications = await apiClient.getNotifications();
+      setNotifications(userNotifications);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const markAsRead = useCallback(async (id: string) => {
+    try {
+      await apiClient.markNotificationAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (error) {
+      console.error('Error marking notification:', error);
+    }
+  }, []);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    try {
+      await apiClient.deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  }, []);
+
+  return { notifications, loading, markAsRead, deleteNotification, refreshNotifications: loadNotifications };
+}
+
+// -----------------------------
+// HABIT ENTRIES HOOK
+// -----------------------------
 export function useHabitEntries(habitId?: string) {
   const [entries, setEntries] = useState<HabitEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -346,8 +372,7 @@ export function useHabitEntries(habitId?: string) {
   const loadEntries = useCallback(async () => {
     setLoading(true);
     try {
-      const habitEntries = await storage.getHabitEntries(habitId);
-      setEntries(habitEntries);
+      setEntries([]);
     } catch (error) {
       console.error('Error loading habit entries:', error);
     } finally {
@@ -359,23 +384,15 @@ export function useHabitEntries(habitId?: string) {
     loadEntries();
   }, [loadEntries]);
 
-  const createEntry = useCallback(async (entryData: {
-    habitId: string;
-    date: Date;
-    completed: boolean;
-    value: number;
-    notes?: string;
-  }) => {
+  const createEntry = useCallback(async (entryData: any) => {
     const newEntry: HabitEntry = {
       id: `entry-${Date.now()}`,
       ...entryData,
       createdAt: new Date()
     };
-
     try {
-      const createdEntry = await storage.createHabitEntry(newEntry);
-      setEntries(prev => [...prev, createdEntry]);
-      return createdEntry;
+      setEntries(prev => [...prev, newEntry]);
+      return newEntry;
     } catch (error) {
       console.error('Error creating habit entry:', error);
       return null;
@@ -384,11 +401,8 @@ export function useHabitEntries(habitId?: string) {
 
   const updateEntry = useCallback(async (id: string, updates: Partial<HabitEntry>) => {
     try {
-      const updatedEntry = await storage.updateHabitEntry(id, updates);
-      if (updatedEntry) {
-        setEntries(prev => prev.map(entry => entry.id === id ? updatedEntry : entry));
-      }
-      return updatedEntry;
+      setEntries(prev => prev.map(entry => entry.id === id ? { ...entry, ...updates } : entry));
+      return true;
     } catch (error) {
       console.error('Error updating habit entry:', error);
       return null;
@@ -403,357 +417,3 @@ export function useHabitEntries(habitId?: string) {
     refreshEntries: loadEntries
   };
 }
-
-// Calendar Events Hook
-export function useCalendarEvents() {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-
-  const loadEvents = useCallback(async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const userEvents = await storage.getEvents(user.id);
-      setEvents(userEvents);
-    } catch (error) {
-      console.error('Error loading events:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
-
-  const createEvent = useCallback(async (eventData: {
-    title: string;
-    description?: string;
-    start: Date;
-    end: Date;
-    allDay?: boolean;
-    type: EventType;
-    sourceId?: string;
-    sourceType?: EventSourceType;
-    color: string;
-  }) => {
-    if (!user) return null;
-
-    const newEvent: CalendarEvent = {
-      id: `event-${Date.now()}`,
-      ...eventData,
-      userId: user.id,
-      createdAt: new Date(),
-      allDay: eventData.allDay ?? false
-    };
-
-    try {
-      const createdEvent = await storage.createEvent(newEvent);
-      setEvents(prev => [...prev, createdEvent]);
-      return createdEvent;
-    } catch (error) {
-      console.error('Error creating event:', error);
-      return null;
-    }
-  }, [user]);
-
-  const updateEvent = useCallback(async (id: string, updates: Partial<CalendarEvent>) => {
-    try {
-      const updatedEvent = await storage.updateEvent(id, updates);
-      if (updatedEvent) {
-        setEvents(prev => prev.map(event => event.id === id ? updatedEvent : event));
-      }
-      return updatedEvent;
-    } catch (error) {
-      console.error('Error updating event:', error);
-      return null;
-    }
-  }, []);
-
-  const deleteEvent = useCallback(async (id: string) => {
-    try {
-      const success = await storage.deleteEvent(id);
-      if (success) {
-        setEvents(prev => prev.filter(event => event.id !== id));
-      }
-      return success;
-    } catch (error) {
-      console.error('Error deleting event:', error);
-      return false;
-    }
-  }, []);
-
-  return {
-    events,
-    loading,
-    createEvent,
-    updateEvent,
-    deleteEvent,
-    refreshEvents: loadEvents
-  };
-}
-
-// Pomodoro Sessions Hook
-export function usePomodoroSessions() {
-  const [sessions, setSessions] = useState<PomodoroSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-
-  const loadSessions = useCallback(async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const userSessions = await storage.getPomodoroSessions(user.id);
-      setSessions(userSessions);
-    } catch (error) {
-      console.error('Error loading pomodoro sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  const createSession = useCallback(async (sessionData: {
-    taskId?: string;
-    type: PomodoroType;
-    duration: number;
-    startTime: Date;
-    notes?: string;
-  }) => {
-    if (!user) return null;
-
-    const newSession: PomodoroSession = {
-      id: `session-${Date.now()}`,
-      ...sessionData,
-      userId: user.id,
-      endTime: undefined,
-      completed: false
-    };
-
-    try {
-      const createdSession = await storage.createPomodoroSession(newSession);
-      setSessions(prev => [...prev, createdSession]);
-      return createdSession;
-    } catch (error) {
-      console.error('Error creating pomodoro session:', error);
-      return null;
-    }
-  }, [user]);
-
-  const updateSession = useCallback(async (id: string, updates: Partial<PomodoroSession>) => {
-    try {
-      const updatedSession = await storage.updatePomodoroSession(id, updates);
-      if (updatedSession) {
-        setSessions(prev => prev.map(session => session.id === id ? updatedSession : session));
-      }
-      return updatedSession;
-    } catch (error) {
-      console.error('Error updating pomodoro session:', error);
-      return null;
-    }
-  }, []);
-
-  return {
-    sessions,
-    loading,
-    createSession,
-    updateSession,
-    refreshSessions: loadSessions
-  };
-}
-
-// Notifications Hook
-export function useNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-
-  const loadNotifications = useCallback(async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const userNotifications = await storage.getNotifications(user.id);
-      setNotifications(userNotifications);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
-  const createNotification = useCallback(async (notificationData: {
-    type: NotificationType;
-    title: string;
-    message: string;
-    actionUrl?: string;
-    metadata?: Record<string, any>;
-  }) => {
-    if (!user) return null;
-
-    const newNotification: Notification = {
-      id: `notification-${Date.now()}`,
-      ...notificationData,
-      userId: user.id,
-      read: false,
-      createdAt: new Date()
-    };
-
-    try {
-      const createdNotification = await storage.createNotification(newNotification);
-      setNotifications(prev => [createdNotification, ...prev]);
-      return createdNotification;
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      return null;
-    }
-  }, [user]);
-
-  const markAsRead = useCallback(async (id: string) => {
-    try {
-      const success = await storage.markNotificationAsRead(id);
-      if (success) {
-        setNotifications(prev => prev.map(notification => 
-          notification.id === id ? { ...notification, read: true } : notification
-        ));
-      }
-      return success;
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      return false;
-    }
-  }, []);
-
-  const deleteNotification = useCallback(async (id: string) => {
-    try {
-      const success = await storage.deleteNotification(id);
-      if (success) {
-        setNotifications(prev => prev.filter(notification => notification.id !== id));
-      }
-      return success;
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-      return false;
-    }
-  }, []);
-
-  return {
-    notifications,
-    loading,
-    createNotification,
-    markAsRead,
-    deleteNotification,
-    refreshNotifications: loadNotifications
-  };
-}
-
-// Local Storage Hook
-export function useLocalStorage<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(`Error reading localStorage key "${key}":`, error);
-      return initialValue;
-    }
-  });
-
-  const setValue = useCallback((value: T | ((val: T) => T)) => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
-    }
-  }, [key, storedValue]);
-
-  return [storedValue, setValue] as const;
-}
-
-// Debounced Value Hook
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-// Previous Value Hook
-export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T | undefined>(undefined);
-  
-  useEffect(() => {
-    ref.current = value;
-  });
-  
-  return ref.current;
-}
-
-// Interval Hook
-export function useInterval(callback: () => void, delay: number | null) {
-  const savedCallback = useRef(callback);
-
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
-
-  useEffect(() => {
-    if (delay === null) return;
-
-    const id = setInterval(() => savedCallback.current(), delay);
-    return () => clearInterval(id);
-  }, [delay]);
-}
-
-// Timeout Hook
-export function useTimeout(callback: () => void, delay: number | null) {
-  const savedCallback = useRef(callback);
-
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
-
-  useEffect(() => {
-    if (delay === null) return;
-
-    const id = setTimeout(() => savedCallback.current(), delay);
-    return () => clearTimeout(id);
-  }, [delay]);
-}
-
-export default {
-  useAuth,
-  useTasks,
-  useCategories,
-  useHabits,
-  useHabitEntries,
-  useCalendarEvents,
-  usePomodoroSessions,
-  useNotifications,
-  useLocalStorage,
-  useDebounce,
-  usePrevious,
-  useInterval,
-  useTimeout
-};

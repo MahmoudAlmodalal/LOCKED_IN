@@ -34,7 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('categories', CategoryController::class);
-    // Route::apiResource('habits', \App\Http\Controllers\HabitController::class);
+    Route::apiResource('habits', \App\Http\Controllers\HabitController::class);
 
     // Add other future protected routes here...
     // e.g., Route::apiResource('/tasks', TaskController::class);

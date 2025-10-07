@@ -14,7 +14,7 @@ class HabitController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $habits = Habit::where('user_id', $user->id)->get();
+        $habits = Habit::where('user_id', (int) $user->id)->get();
         return response()->json($habits);
     }
 
