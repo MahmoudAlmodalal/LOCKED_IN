@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { authService, AuthState } from './auth';
 import { apiClient } from './api';
 import { RegisterForm } from './types';
@@ -416,4 +416,52 @@ export function useHabitEntries(habitId?: string) {
     updateEntry,
     refreshEntries: loadEntries
   };
+}
+
+// -----------------------------
+// CALENDAR EVENTS HOOK
+// -----------------------------
+export function useCalendarEvents() {
+  const { tasks, loading: tasksLoading } = useTasks();
+  const { habits, loading: habitsLoading } = useHabits();
+
+  // useMemo will prevent re-calculating the events on every render
+  const events = useMemo(() => {
+    // Map tasks to calendar events
+    const taskEvents: CalendarEvent[] = tasks
+      .filter(task => task.dueDate) // Only use tasks that have a due date
+      .map(task => ({
+        id: `task-${task.id}`,
+        title: task.title,
+        start: task.dueDate,
+        allDay: true, // Let's assume tasks are all-day events on their due date
+        source: EventSourceType.TASK,
+        extendedProps: {
+          ...task
+        },
+        // Style events based on priority
+        backgroundColor: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
+        borderColor: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
+      }));
+
+    // Map habits to calendar events (this is a simple example)
+    const habitEvents: CalendarEvent[] = habits.map(habit => ({
+      id: `habit-${habit.id}`,
+      title: `Habit: ${habit.name}`,
+      start: habit.createdAt, // This just shows when the habit was created. A real implementation is more complex!
+      allDay: true,
+      source: EventSourceType.HABIT,
+      extendedProps: {
+        ...habit
+      },
+      backgroundColor: '#198754',
+      borderColor: '#198754',
+    }));
+
+    return [...taskEvents, ...habitEvents];
+  }, [tasks, habits]);
+
+  const loading = tasksLoading || habitsLoading;
+
+  return { events, loading };
 }
