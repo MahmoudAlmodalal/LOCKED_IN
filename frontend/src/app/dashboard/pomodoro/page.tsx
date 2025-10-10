@@ -363,17 +363,16 @@ export default function PomodoroPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Tasks</h3>
               <div className="space-y-3">
-                {tasks.filter(task => task.status !== 'completed').slice(0, 3).map(task => (
+                {tasks.filter(task => task.status !== 'Done').slice(0, 3).map(task => (
                   <div key={task.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                     <div className={`w-3 h-3 rounded-full ${
-                      task.priority === 'urgent' ? 'bg-red-500' :
-                      task.priority === 'high' ? 'bg-orange-500' :
-                      task.priority === 'medium' ? 'bg-yellow-500' : 'bg-gray-400'
+                      task.priority === 'High' ? 'bg-orange-500' :
+                      task.priority === 'Medium' ? 'bg-yellow-500' : 'bg-gray-400'
                     }`}></div>
                     <span className="text-sm text-gray-700 flex-1 truncate">{task.title}</span>
                   </div>
                 ))}
-                {tasks.filter(task => task.status !== 'completed').length === 0 && (
+                {tasks.filter(task => task.status !== 'Done').length === 0 && (
                   <p className="text-gray-500 text-sm">No pending tasks</p>
                 )}
               </div>

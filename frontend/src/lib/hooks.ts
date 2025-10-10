@@ -82,8 +82,8 @@ export function useTasks() {
         userId: task.user_id.toString(),
         title: task.title,
         description: task.description,
-        status: task.status?.toLowerCase().replace(' ', '_') || 'todo',
-        priority: task.priority?.toLowerCase() || 'medium',
+        status: task.status || 'To Do',
+        priority: task.priority || 'Medium',
         categoryId: task.category_id?.toString(),
         dueDate: task.deadline ? new Date(task.deadline) : undefined,
         estimatedTime: task.estimated_time,
@@ -115,7 +115,7 @@ export function useTasks() {
         title: taskData.title,
         description: taskData.description,
         status: 'To Do',
-        priority: taskData.priority === 'urgent' ? 'High' : taskData.priority.charAt(0).toUpperCase() + taskData.priority.slice(1),
+        priority: taskData.priority || 'Medium',
         category_id: taskData.categoryId || null,
         deadline: taskData.dueDate ? taskData.dueDate.toISOString().split('T')[0] : null
       };
@@ -514,7 +514,7 @@ export function useCalendarEvents() {
         type: EventType.TASK_DEADLINE,
         sourceId: task.id,
         sourceType: EventSourceType.TASK,
-        color: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
+        color: task.priority === 'High' ? '#dc3545' : (task.priority === 'Medium' ? '#ffc107' : '#0d6efd'),
         userId: task.userId,
         createdAt: task.createdAt,
       }));

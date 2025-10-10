@@ -343,11 +343,11 @@ class AuthService {
       return {
         tasks: {
           total: tasks.length,
-          completed: tasks.filter((task: any) => task.status === 'completed').length,
+          completed: tasks.filter((task: any) => task.status === 'Done').length,
           overdue: tasks.filter((task: any) => 
             task.due_date && 
             new Date(task.due_date) < today && 
-            task.status !== 'completed'
+            task.status !== 'Done'
           ).length
         },
         habits: {
