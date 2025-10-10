@@ -59,7 +59,7 @@ export default function TasksPage() {
   };
 
   const handleToggleComplete = async (task: any) => {
-    const newStatus: TaskStatus = task.status === 'completed' ? TaskStatus.TODO : TaskStatus.COMPLETED;
+    const newStatus: TaskStatus = task.status === 'Done' ? TaskStatus.TODO : TaskStatus.DONE;
     await updateTask(task.id, { status: newStatus });
   };
 
@@ -116,11 +116,9 @@ export default function TasksPage() {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Status</option>
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
             </select>
 
             {/* Priority Filter */}
@@ -130,10 +128,9 @@ export default function TasksPage() {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Priorities</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
             </select>
           </div>
         </div>
@@ -164,7 +161,7 @@ export default function TasksPage() {
             <div className="divide-y divide-gray-200">
               {filteredTasks.map((task) => {
                 const category = categories.find(cat => cat.id === task.categoryId);
-                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed';
+                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Done';
                 
                 return (
                   <div key={task.id} className="p-6 hover:bg-gray-50 transition-colors">
@@ -175,7 +172,7 @@ export default function TasksPage() {
                           onClick={() => handleToggleComplete(task)}
                           className="mt-1"
                         >
-                          {task.status === 'completed' ? (
+                          {task.status === 'Done' ? (
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
                           ) : (
                             <Circle className="w-5 h-5 text-gray-400 hover:text-green-600" />
@@ -186,7 +183,7 @@ export default function TasksPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
                             <h3 className={`text-lg font-medium ${
-                              task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'
+                              task.status === 'Done' ? 'line-through text-gray-500' : 'text-gray-900'
                             }`}>
                               {task.title}
                             </h3>
@@ -308,7 +305,7 @@ function CreateTaskModal({ categories, onClose, onSubmit }: any) {
     title: '',
     description: '',
     categoryId: '',
-    priority: 'medium' as TaskPriority,
+    priority: 'Medium' as TaskPriority,
     dueDate: '',
     estimatedTime: '',
     labels: [] as string[]
@@ -372,10 +369,9 @@ function CreateTaskModal({ categories, onClose, onSubmit }: any) {
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value as TaskPriority })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
               </select>
             </div>
           </div>
@@ -496,10 +492,9 @@ function EditTaskModal({ task, categories, onClose, onSubmit }: any) {
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
               </select>
             </div>
           </div>
@@ -511,11 +506,9 @@ function EditTaskModal({ task, categories, onClose, onSubmit }: any) {
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
             </select>
           </div>
 

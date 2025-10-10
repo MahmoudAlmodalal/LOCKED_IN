@@ -49,17 +49,17 @@ export default function DashboardPage() {
   }
 
   // Calculate dashboard statistics
-  const completedTasks = tasks.filter(task => task.status === 'completed').length;
+  const completedTasks = tasks.filter(task => task.status === 'Done').length;
   const overdueTasks = tasks.filter(task => 
     task.dueDate && 
     new Date(task.dueDate) < new Date() && 
-    task.status !== 'completed'
+    task.status !== 'Done'
   ).length;
   const dueTodayTasks = tasks.filter(task => {
     if (!task.dueDate) return false;
     const today = new Date();
     const dueDate = new Date(task.dueDate);
-    return dueDate.toDateString() === today.toDateString() && task.status !== 'completed';
+    return dueDate.toDateString() === today.toDateString() && task.status !== 'Done';
   }).length;
 
   const activeHabits = habits.filter(habit => habit.isActive).length;
@@ -212,13 +212,12 @@ export default function DashboardPage() {
                       <div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className={`w-3 h-3 rounded-full ${
-                            task.status === 'completed' ? 'bg-green-500' : 
-                            task.priority === 'urgent' ? 'bg-red-500' :
-                            task.priority === 'high' ? 'bg-orange-500' :
-                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-gray-400'
+                            task.status === 'Done' ? 'bg-green-500' : 
+                            task.priority === 'High' ? 'bg-orange-500' :
+                            task.priority === 'Medium' ? 'bg-yellow-500' : 'bg-gray-400'
                           }`}></div>
                           <div>
-                            <p className={`font-medium ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                            <p className={`font-medium ${task.status === 'Done' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
                               {task.title}
                             </p>
                             {task.dueDate && (
@@ -230,11 +229,11 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            task.status === 'Done' ? 'bg-green-100 text-green-800' :
+                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {task.status.replace('_', ' ')}
+                            {task.status}
                           </span>
                         </div>
                       </div>
