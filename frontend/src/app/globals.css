@@ -24,3 +24,48 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Input, textarea, and select styling for better visibility */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  color: #1f2937 !important; /* Dark gray text for light backgrounds */
+  background-color: #ffffff !important; /* White background */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important; /* Light gray placeholder text */
+}
+
+/* Dark mode support for input fields */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    color: #f9fafb !important; /* Light text for dark backgrounds */
+    background-color: #374151 !important; /* Dark gray background */
+    border-color: #4b5563 !important; /* Slightly lighter border */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important; /* Medium gray placeholder text */
+  }
+}
