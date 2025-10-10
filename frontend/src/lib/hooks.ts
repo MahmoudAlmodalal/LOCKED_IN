@@ -76,8 +76,8 @@ export function useTasks() {
     if (!user) return;
     setLoading(true);
     try {
-      const apiTasks = await apiClient.getTasks();
-      const transformedTasks = apiTasks.map((task: any) => ({
+  const apiTasks = (await apiClient.getTasks()) as any[];
+  const transformedTasks = apiTasks.map((task: any) => ({
         id: task.id.toString(),
         userId: task.user_id.toString(),
         title: task.title,
@@ -159,8 +159,8 @@ export function useCategories() {
     if (!user) return;
     setLoading(true);
     try {
-      const apiCategories = await apiClient.getCategories();
-      const transformedCategories = apiCategories.map((category: any) => ({
+  const apiCategories = (await apiClient.getCategories()) as any[];
+  const transformedCategories = apiCategories.map((category: any) => ({
         id: category.id.toString(),
         userId: category.user_id.toString(),
         name: category.name,
@@ -225,8 +225,25 @@ export function useHabits() {
     if (!user) return;
     setLoading(true);
     try {
-      const userHabits = await apiClient.getHabits();
-      setHabits(userHabits);
+  const apiHabits = (await apiClient.getHabits()) as any[];
+  const transformed: Habit[] = apiHabits.map((h: any) => ({
+        id: String(h.id),
+        userId: String(h.user_id ?? user.id),
+        title: h.title,
+        description: h.description ?? '',
+        frequency: (h.frequency ?? 'daily') as HabitFrequency,
+        target: Number(h.target ?? 1),
+        unit: h.unit ?? 'times',
+        color: h.color ?? '#10B981',
+        icon: h.icon ?? undefined,
+        createdAt: h.created_at ? new Date(h.created_at) : new Date(),
+        updatedAt: h.updated_at ? new Date(h.updated_at) : new Date(),
+        isActive: Boolean(h.is_active ?? true),
+        streak: Number(h.streak ?? 0),
+        bestStreak: Number(h.best_streak ?? 0),
+        totalCompletions: Number(h.total_completions ?? 0),
+      }));
+      setHabits(transformed);
     } catch (error) {
       console.error('Error loading habits:', error);
     } finally {
@@ -240,7 +257,18 @@ export function useHabits() {
 
   const createHabit = useCallback(async (habitData: any) => {
     try {
-      await apiClient.createHabit(habitData);
+      // Map to backend shape (snake_case)
+      const payload = {
+        title: habitData.title,
+        description: habitData.description ?? null,
+        frequency: habitData.frequency,
+        target: habitData.target ?? 1,
+        unit: habitData.unit ?? 'times',
+        color: habitData.color ?? '#10B981',
+        icon: habitData.icon ?? null,
+        is_active: habitData.isActive ?? true,
+      };
+      await apiClient.createHabit(payload);
       await loadHabits();
     } catch (error) {
       console.error('Error creating habit:', error);
@@ -249,7 +277,20 @@ export function useHabits() {
 
   const updateHabit = useCallback(async (id: string, updates: any) => {
     try {
-      await apiClient.updateHabit(id, updates);
+      const payload = {
+        ...(updates.title !== undefined && { title: updates.title }),
+        ...(updates.description !== undefined && { description: updates.description }),
+        ...(updates.frequency !== undefined && { frequency: updates.frequency }),
+        ...(updates.target !== undefined && { target: updates.target }),
+        ...(updates.unit !== undefined && { unit: updates.unit }),
+        ...(updates.color !== undefined && { color: updates.color }),
+        ...(updates.icon !== undefined && { icon: updates.icon }),
+        ...(updates.isActive !== undefined && { is_active: updates.isActive }),
+        ...(updates.streak !== undefined && { streak: updates.streak }),
+        ...(updates.bestStreak !== undefined && { best_streak: updates.bestStreak }),
+        ...(updates.totalCompletions !== undefined && { total_completions: updates.totalCompletions }),
+      };
+      await apiClient.updateHabit(id, payload);
       await loadHabits();
     } catch (error) {
       console.error('Error updating habit:', error);
@@ -280,8 +321,8 @@ export function usePomodoroSessions() {
     if (!user) return;
     setLoading(true);
     try {
-      const userSessions = await apiClient.getPomodoroSessions();
-      setSessions(userSessions);
+  const userSessions = (await apiClient.getPomodoroSessions()) as any[];
+  setSessions(userSessions as unknown as PomodoroSession[]);
     } catch (error) {
       console.error('Error loading sessions:', error);
     } finally {
@@ -326,8 +367,8 @@ export function useNotifications() {
     if (!user) return;
     setLoading(true);
     try {
-      const userNotifications = await apiClient.getNotifications();
-      setNotifications(userNotifications);
+  const userNotifications = (await apiClient.getNotifications()) as any[];
+  setNotifications(userNotifications as unknown as Notification[]);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -423,45 +464,102 @@ export function useHabitEntries(habitId?: string) {
 // -----------------------------
 export function useCalendarEvents() {
   const { tasks, loading: tasksLoading } = useTasks();
-  const { habits, loading: habitsLoading } = useHabits();
+  const { user } = useAuth();
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // useMemo will prevent re-calculating the events on every render
-  const events = useMemo(() => {
-    // Map tasks to calendar events
+  const loadEvents = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const apiEvents = (await apiClient.getCalendarEvents()) as any[];
+      const transformedEvents = apiEvents.map((event: any) => ({
+        id: event.id.toString(),
+        userId: event.user_id.toString(),
+        title: event.title,
+        description: event.description,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        allDay: !!event.all_day,
+        type: event.type as EventType,
+        sourceId: event.source_id?.toString(),
+        sourceType: event.source_type as EventSourceType,
+        color: event.color,
+        createdAt: new Date(event.created_at),
+        updatedAt: new Date(event.updated_at),
+      }));
+      setEvents(transformedEvents);
+    } catch (error) {
+      console.error("Error loading calendar events:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  // Merge task deadlines into the in-memory list
+  const computedEvents = useMemo(() => {
     const taskEvents: CalendarEvent[] = tasks
-      .filter(task => task.dueDate) // Only use tasks that have a due date
+      .filter(task => !!task.dueDate)
       .map(task => ({
         id: `task-${task.id}`,
         title: task.title,
-        start: task.dueDate,
-        allDay: true, // Let's assume tasks are all-day events on their due date
-        source: EventSourceType.TASK,
-        extendedProps: {
-          ...task
-        },
-        // Style events based on priority
-        backgroundColor: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
-        borderColor: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
+        description: task.description,
+        start: task.dueDate!,
+        end: task.dueDate!,
+        allDay: true,
+        type: EventType.TASK_DEADLINE,
+        sourceId: task.id,
+        sourceType: EventSourceType.TASK,
+        color: task.priority === 'high' ? '#dc3545' : (task.priority === 'urgent' ? '#ffc107' : '#0d6efd'),
+        userId: task.userId,
+        createdAt: task.createdAt,
       }));
 
-    // Map habits to calendar events (this is a simple example)
-    const habitEvents: CalendarEvent[] = habits.map(habit => ({
-      id: `habit-${habit.id}`,
-      title: `Habit: ${habit.name}`,
-      start: habit.createdAt, // This just shows when the habit was created. A real implementation is more complex!
-      allDay: true,
-      source: EventSourceType.HABIT,
-      extendedProps: {
-        ...habit
-      },
-      backgroundColor: '#198754',
-      borderColor: '#198754',
-    }));
+    return [...events, ...taskEvents];
+  }, [events, tasks]);
 
-    return [...taskEvents, ...habitEvents];
-  }, [tasks, habits]);
+  const createEvent = useCallback(async (eventData: Omit<CalendarEvent, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newEvent = await apiClient.createCalendarEvent({
+        ...eventData,
+        all_day: eventData.allDay,
+      });
+      await loadEvents(); // Refresh list
+      return newEvent;
+    } catch (error) {
+      console.error("Failed to create event:", error);
+      throw error;
+    }
+  }, [loadEvents]);
 
-  const loading = tasksLoading || habitsLoading;
+  const updateEvent = useCallback(async (id: string, updates: Partial<CalendarEvent>) => {
+    try {
+      await apiClient.updateCalendarEvent(id, {
+        ...updates,
+        all_day: updates.allDay,
+      });
+      await loadEvents(); // Refresh list
+    } catch (error) {
+      console.error("Failed to update event:", error);
+      throw error;
+    }
+  }, [loadEvents]);
 
-  return { events, loading };
+  const deleteEvent = useCallback(async (id: string) => {
+    try {
+      await apiClient.deleteCalendarEvent(id);
+      await loadEvents(); // Refresh list
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+      throw error;
+    }
+  }, [loadEvents]);
+
+  const combinedLoading = tasksLoading || loading;
+
+  return { events: computedEvents, loading: combinedLoading, createEvent, updateEvent, deleteEvent, refreshEvents: loadEvents };
 }

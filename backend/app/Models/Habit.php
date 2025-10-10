@@ -19,6 +19,8 @@ class Habit extends Model
         'icon',
         'is_active',
         'streak',
+        'best_streak',
+        'total_completions',
     ];
 
     /**
