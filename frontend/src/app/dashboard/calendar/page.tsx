@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import bootstrap5Plugin from '@fullcalendar/bootstrap5';
-import { useTasks, useCalendarEvents, useHabits } from '@/lib/hooks';
+import { useTasks, useCalendarEvents } from '@/lib/hooks';
 import { 
   Calendar, 
   Plus,
@@ -24,7 +24,6 @@ import { EventType, EventSourceType } from '@/lib/types';
 export default function CalendarPage() {
   const { tasks } = useTasks();
   const { events, createEvent, updateEvent, deleteEvent } = useCalendarEvents();
-  const { habits } = useHabits();
   
   const [currentView, setCurrentView] = useState('dayGridMonth');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,29 +51,9 @@ export default function CalendarPage() {
       }
     }));
 
-  // Convert habits to calendar events (daily reminders)
-  const habitEvents = habits
-    .filter(habit => habit.isActive && habit.frequency === 'daily')
-    .map(habit => ({
-      id: `habit-${habit.id}`,
-      title: habit.title,
-      start: new Date(),
-      end: new Date(),
-      allDay: true,
-      color: '#10B981',
-      extendedProps: {
-        type: 'habit',
-        sourceId: habit.id,
-        sourceType: EventSourceType.HABIT,
-        description: habit.description,
-        frequency: habit.frequency
-      }
-    }));
-
   // Combine all events
   const allEvents = [
     ...taskEvents,
-    ...habitEvents,
     ...events.map(event => ({
       id: event.id,
       title: event.title,
@@ -112,13 +91,8 @@ export default function CalendarPage() {
 
   const handleCreateEvent = async (eventData: any) => {
     await createEvent({
-      title: eventData.title,
-      description: eventData.description,
-      start: selectedDate || new Date(),
-      end: selectedDate || new Date(),
-      allDay: eventData.allDay,
+      ...eventData,
       type: EventType.CUSTOM_EVENT,
-      color: eventData.color || '#3B82F6'
     });
     setShowCreateModal(false);
     setSelectedDate(null);
@@ -155,40 +129,6 @@ export default function CalendarPage() {
             <p className="text-gray-600 mt-1">View your schedule and manage events</p>
           </div>
           <div className="flex items-center space-x-3">
-            {/* View Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setCurrentView('dayGridMonth')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'dayGridMonth' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Grid3X3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentView('timeGridWeek')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'timeGridWeek' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentView('listWeek')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'listWeek' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-            
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
@@ -198,37 +138,7 @@ export default function CalendarPage() {
             </button>
           </div>
         </div>
-
-        {/* Legend */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Legend</h3>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Urgent Tasks</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">High Priority</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Medium Priority</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Low Priority</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Habits</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Custom Events</span>
-            </div>
-          </div>
-        </div>
+        
 
         {/* Calendar */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -312,6 +222,7 @@ function CreateEventModal({ selectedDate, onClose, onSubmit }: any) {
     title: '',
     description: '',
     allDay: true,
+    date: '',
     startTime: '',
     endTime: '',
     color: '#3B82F6'
@@ -320,8 +231,12 @@ function CreateEventModal({ selectedDate, onClose, onSubmit }: any) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const start = new Date(selectedDate || new Date());
-    const end = new Date(selectedDate || new Date());
+    const baseDate = selectedDate ? new Date(selectedDate) : (formData.date ? new Date(formData.date) : new Date());
+    // Adjust for timezone offset when creating date from string
+    const adjustedDate = formData.date ? new Date(baseDate.getTime() + baseDate.getTimezoneOffset() * 60000) : baseDate;
+
+    const start = new Date(adjustedDate);
+    const end = new Date(adjustedDate);
     
     if (!formData.allDay && formData.startTime && formData.endTime) {
       const [startHour, startMinute] = formData.startTime.split(':');
@@ -364,6 +279,16 @@ function CreateEventModal({ selectedDate, onClose, onSubmit }: any) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
 
           <div>
             <label className="flex items-center">

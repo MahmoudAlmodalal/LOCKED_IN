@@ -3,6 +3,9 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CalendarEventController;
+use App\Http\Controllers\PomodoroSessionController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('tasks', TaskController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('habits', \App\Http\Controllers\HabitController::class);
+    Route::apiResource('calendar-events', CalendarEventController::class);
+    Route::apiResource('pomodoro-sessions', PomodoroSessionController::class);
+    Route::apiResource('notifications', NotificationController::class)->except(['store', 'show']);
 
     // Add other future protected routes here...
     // e.g., Route::apiResource('/tasks', TaskController::class);

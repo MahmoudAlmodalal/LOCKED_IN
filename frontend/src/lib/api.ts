@@ -27,6 +27,7 @@ class ApiClient {
 
     const config: RequestInit = {
       ...options,
+      credentials: 'include',
       headers: {
         ...this.getHeaders(),
         ...options.headers,
@@ -191,6 +192,31 @@ class ApiClient {
 
   async deleteTask(id: string) {
     return this.request(`/tasks/${id}`, { method: "DELETE" });
+  }
+
+  // -------------------------------
+  // ✅ CALENDAR EVENTS ENDPOINTS
+  // -------------------------------
+  async getCalendarEvents() {
+    return this.request("/calendar-events");
+  }
+
+  async createCalendarEvent(event: any) {
+    return this.request("/calendar-events", {
+      method: "POST",
+      body: JSON.stringify(event),
+    });
+  }
+
+  async updateCalendarEvent(id: string, event: any) {
+    return this.request(`/calendar-events/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(event),
+    });
+  }
+
+  async deleteCalendarEvent(id: string) {
+    return this.request(`/calendar-events/${id}`, { method: "DELETE" });
   }
 
   // -------------------------------
