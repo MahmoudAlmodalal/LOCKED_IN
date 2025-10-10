@@ -128,7 +128,21 @@ export function useTasks() {
 
   const updateTask = useCallback(async (id: string, updates: any) => {
     try {
-      await apiClient.updateTask(id, updates);
+      const apiUpdates: any = {};
+      
+      // Transform camelCase to snake_case for API
+      if (updates.title !== undefined) apiUpdates.title = updates.title;
+      if (updates.description !== undefined) apiUpdates.description = updates.description;
+      if (updates.status !== undefined) apiUpdates.status = updates.status;
+      if (updates.priority !== undefined) apiUpdates.priority = updates.priority;
+      if (updates.categoryId !== undefined) apiUpdates.category_id = updates.categoryId || null;
+      if (updates.dueDate !== undefined) {
+        apiUpdates.deadline = updates.dueDate ? 
+          (updates.dueDate instanceof Date ? updates.dueDate.toISOString().split('T')[0] : updates.dueDate) : 
+          null;
+      }
+      
+      await apiClient.updateTask(id, apiUpdates);
       await loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);

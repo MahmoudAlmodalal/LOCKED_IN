@@ -27,9 +27,9 @@ class TaskController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // 3. Load the tasks using the relationship.
+        // 3. Load the tasks using the relationship with category.
         // We are now 100% sure that $user is a valid User object.
-        $tasks = $user->tasks()->latest()->get();
+        $tasks = $user->tasks()->with('category')->latest()->get();
 
         // 4. Return the tasks.
         return response()->json($tasks);
@@ -75,6 +75,9 @@ class TaskController extends Controller
 
         // Create the task with the prepared data
         $task = Task::create($validatedData);
+        
+        // Load the category relationship
+        $task->load('category');
 
         return response()->json($task, 201);
     }
@@ -133,6 +136,9 @@ class TaskController extends Controller
 
         // Update the task with the validated data
         $task->update($validatedData);
+        
+        // Load the category relationship
+        $task->load('category');
 
         return response()->json($task);
     }

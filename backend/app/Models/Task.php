@@ -23,6 +23,7 @@ class Task extends Model
         'status',
         'creator_id',
         'deadline',
+        'category_id',
     ];
 
     /**
