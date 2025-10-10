@@ -22,13 +22,14 @@ import { TaskPriority, TaskStatus } from '@/lib/types';
 
 export default function TasksPage() {
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = useTasks();
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { categories, loading: categoriesLoading, createCategory } = useCategories();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
 
   // Filter tasks based on search and filters
@@ -72,13 +73,22 @@ export default function TasksPage() {
             <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
             <p className="text-gray-600 mt-1">Manage your tasks and stay organized</p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Task
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowCreateCategoryModal(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </button>
+          </div>
         </div>
       </div>
 
@@ -209,7 +219,7 @@ export default function TasksPage() {
 
                             {/* Category */}
                             {category && (
-                              <span className="flex items-center text-gray-500">
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 flex items-center">
                                 <Tag className="w-3 h-3 mr-1" />
                                 {category.name}
                               </span>
@@ -217,38 +227,14 @@ export default function TasksPage() {
 
                             {/* Due Date */}
                             {task.dueDate && (
-                              <span className={`flex items-center ${
-                                isOverdue ? 'text-red-600' : 'text-gray-500'
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${
+                                isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
                               }`}>
                                 <Calendar className="w-3 h-3 mr-1" />
                                 {getRelativeDate(task.dueDate)}
                               </span>
                             )}
-
-                            {/* Estimated Time */}
-                            {task.estimatedTime && (
-                              <span className="flex items-center text-gray-500">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {Math.round(task.estimatedTime / 60)}h
-                              </span>
-                            )}
                           </div>
-
-                          {/* Progress Bar */}
-                          {task.progress > 0 && (
-                            <div className="mt-3">
-                              <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                                <span>Progress</span>
-                                <span>{task.progress}%</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                  style={{ width: `${task.progress}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -295,6 +281,17 @@ export default function TasksPage() {
           onSubmit={(updates: any) => handleUpdateTask(editingTask.id, updates)}
         />
       )}
+
+      {/* Create Category Modal */}
+      {showCreateCategoryModal && (
+        <CreateCategoryModal
+          onClose={() => setShowCreateCategoryModal(false)}
+          onSubmit={async (categoryData: any) => {
+            await createCategory(categoryData);
+            setShowCreateCategoryModal(false);
+          }}
+        />
+      )}
       </div>
   );
 }
@@ -307,7 +304,6 @@ function CreateTaskModal({ categories, onClose, onSubmit }: any) {
     categoryId: '',
     priority: 'Medium' as TaskPriority,
     dueDate: '',
-    estimatedTime: '',
     labels: [] as string[]
   });
 
@@ -315,8 +311,7 @@ function CreateTaskModal({ categories, onClose, onSubmit }: any) {
     e.preventDefault();
     onSubmit({
       ...formData,
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-      estimatedTime: formData.estimatedTime ? parseInt(formData.estimatedTime) * 60 : undefined
+      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined
     });
   };
 
@@ -376,28 +371,14 @@ function CreateTaskModal({ categories, onClose, onSubmit }: any) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Time (hours)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={formData.estimatedTime}
-                onChange={(e) => setFormData({ ...formData, estimatedTime: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
@@ -429,17 +410,14 @@ function EditTaskModal({ task, categories, onClose, onSubmit }: any) {
     categoryId: task.categoryId || '',
     priority: task.priority,
     status: task.status,
-    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-    estimatedTime: task.estimatedTime ? Math.round(task.estimatedTime / 60).toString() : '',
-    progress: task.progress
+    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
       ...formData,
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-      estimatedTime: formData.estimatedTime ? parseInt(formData.estimatedTime as string) * 60 : undefined
+      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined
     });
   };
 
@@ -512,28 +490,14 @@ function EditTaskModal({ task, categories, onClose, onSubmit }: any) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Progress (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={formData.progress}
-                onChange={(e) => setFormData({ ...formData, progress: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
@@ -549,6 +513,56 @@ function EditTaskModal({ task, categories, onClose, onSubmit }: any) {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Update Task
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Create Category Modal Component
+function CreateCategoryModal({ onClose, onSubmit }: any) {
+  const [formData, setFormData] = useState({
+    name: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Category</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., Work, Personal, Shopping"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Create Category
             </button>
           </div>
         </form>
