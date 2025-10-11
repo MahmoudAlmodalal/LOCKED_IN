@@ -1,5 +1,6 @@
-import { apiClient } from './api';
-import { User, UserRole, LoginForm, RegisterForm } from './types';
+import { apiClient } from "./api";
+import { User, UserRole, LoginForm, RegisterForm } from "./types";
+import storage from "./storage";
 
 export interface AuthState {
   user: User | null;
@@ -213,11 +214,15 @@ class AuthService {
     try {
       await apiClient.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      // Even if logout fails, we clear the client-side session
+      console.error("Logout error:", error);
     } finally {
-      localStorage.removeItem('auth_token');
+      // Always clear local storage and update state
+      if (isBrowser) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("currentUser");
+      }
       this.currentUser = null;
-      this.saveUserToStorage(null);
       this.notifyListeners();
     }
   }

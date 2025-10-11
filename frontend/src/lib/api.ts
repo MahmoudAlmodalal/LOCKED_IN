@@ -100,11 +100,23 @@ class ApiClient {
   }
 
   async logout() {
-    const res = await this.request("/logout", { method: "POST" });
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token");
+    try {
+      const res = await this.request("/logout", { method: "POST" });
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+      }
+      return res;
+    } catch (error: any) {
+      if (error.message.includes("Unauthorized")) {
+        // If already unauthorized, just clear the token and resolve
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+        }
+        return { message: "Logged out" };
+      }
+      // Re-throw other errors
+      throw error;
     }
-    return res;
   }
 
   async getUser() {
