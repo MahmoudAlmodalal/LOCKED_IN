@@ -19,11 +19,13 @@ import {
   PomodoroType,
   NotificationType,
 } from './types';
+import { useRouter } from 'next/navigation';
 
 // -----------------------------
 // AUTH HOOK
 // -----------------------------
 export function useAuth() {
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -35,9 +37,16 @@ export function useAuth() {
     return unsubscribe;
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    return await authService.login({ email, password });
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const result = await authService.login({ email, password });
+      if (result.success) {
+        router.push("/dashboard");
+      }
+      return result;
+    },
+    [router]
+  );
 
   const register = useCallback(async (userData: RegisterForm) => {
     return await authService.register(userData);
@@ -45,7 +54,8 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     await authService.logout();
-  }, []);
+    router.push("/login");
+  }, [router]);
 
   const updateProfile = useCallback(async (updates: Partial<User>) => {
     return await authService.updateProfile(updates);
