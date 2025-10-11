@@ -351,10 +351,12 @@ export function usePomodoroSessions() {
 
   const createSession = useCallback(async (data: any) => {
     try {
-      await apiClient.createPomodoroSession(data);
+      const session = await apiClient.createPomodoroSession(data);
       await loadSessions();
+      return session;
     } catch (error) {
       console.error('Error creating session:', error);
+      throw error;
     }
   }, [loadSessions]);
 
