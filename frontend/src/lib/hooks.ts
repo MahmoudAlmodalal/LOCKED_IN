@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { format as formatDate } from 'date-fns';
 import { authService, AuthState } from './auth';
 import { apiClient } from './api';
 import { RegisterForm } from './types';
@@ -423,46 +424,72 @@ export function useNotifications() {
 export function useHabitEntries(habitId?: string) {
   const [entries, setEntries] = useState<HabitEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const loadEntries = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      setEntries([]);
+      const apiEntries = (await apiClient.getHabitEntries(habitId)) as any[];
+      const transformed: HabitEntry[] = apiEntries.map((e: any) => {
+        // Extract just the date portion (YYYY-MM-DD) from ISO string or use as-is
+        const dateString = e.date.split('T')[0]; // Get YYYY-MM-DD from ISO string
+        // Create date at local midnight
+        const entryDate = new Date(`${dateString}T00:00:00`);
+        
+        return {
+          id: String(e.id),
+          habitId: String(e.habit_id),
+          userId: String(e.user_id),
+          date: entryDate,
+          completed: Boolean(e.completed),
+          value: e.value ? Number(e.value) : undefined,
+          createdAt: new Date(e.created_at),
+          updatedAt: new Date(e.updated_at),
+        };
+      });
+      setEntries(transformed);
     } catch (error) {
       console.error('Error loading habit entries:', error);
     } finally {
       setLoading(false);
     }
-  }, [habitId]);
+  }, [user, habitId]);
 
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
 
   const createEntry = useCallback(async (entryData: any) => {
-    const newEntry: HabitEntry = {
-      id: `entry-${Date.now()}`,
-      ...entryData,
-      createdAt: new Date()
-    };
     try {
-      setEntries(prev => [...prev, newEntry]);
-      return newEntry;
+      const payload = {
+        habit_id: entryData.habitId,
+        // Use local date to match user's selection (avoid timezone offset from toISOString)
+        date: formatDate(entryData.date, 'yyyy-MM-dd'),
+        completed: entryData.completed,
+        value: entryData.value,
+      };
+      await apiClient.createHabitEntry(payload);
+      await loadEntries();
     } catch (error) {
       console.error('Error creating habit entry:', error);
-      return null;
+      throw error; // Re-throw to let the caller handle it
     }
-  }, []);
+  }, [loadEntries]);
 
-  const updateEntry = useCallback(async (id: string, updates: Partial<HabitEntry>) => {
+  const updateEntry = useCallback(async (id: string, updates: any) => {
     try {
-      setEntries(prev => prev.map(entry => entry.id === id ? { ...entry, ...updates } : entry));
-      return true;
+      const payload: any = {};
+      if (updates.completed !== undefined) payload.completed = updates.completed;
+      if (updates.value !== undefined) payload.value = updates.value;
+      
+      await apiClient.updateHabitEntry(id, payload);
+      await loadEntries();
     } catch (error) {
       console.error('Error updating habit entry:', error);
-      return null;
+      throw error; // Re-throw to let the caller handle it
     }
-  }, []);
+  }, [loadEntries]);
 
   return {
     entries,

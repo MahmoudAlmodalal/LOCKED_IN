@@ -13,10 +13,15 @@ import {
   Edit,
   Trash2,
   BarChart3,
-  Flame
+  Flame,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { formatDate, getRelativeDate } from '@/lib/utils';
 import { HabitFrequency } from '@/lib/types';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/style.css';
+import { format } from 'date-fns';
 
 export default function HabitsPage() {
   const { habits, loading: habitsLoading, createHabit, updateHabit, deleteHabit } = useHabits();
@@ -25,7 +30,7 @@ export default function HabitsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingHabit, setEditingHabit] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
 
   const handleCreateHabit = async (habitData: any) => {
     await createHabit(habitData);
@@ -44,33 +49,48 @@ export default function HabitsPage() {
   };
 
   const handleToggleHabit = async (habit: any) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    if (togglingHabitId) return; // Prevent multiple simultaneous toggles
     
-    const todayEntry = entries.find(entry => 
-      entry.habitId === habit.id && 
-      new Date(entry.date).toDateString() === today.toDateString()
-    );
+    setTogglingHabitId(habit.id);
+    
+    try {
+      const targetDate = new Date(selectedDate);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      const entryForSelectedDate = entries.find(entry => {
+        const entryDate = new Date(entry.date);
+        entryDate.setHours(0, 0, 0, 0);
+        return String(entry.habitId) === String(habit.id) && 
+               entryDate.toDateString() === targetDate.toDateString();
+      });
 
-    if (todayEntry) {
-      // Toggle existing entry
-      await updateEntry(todayEntry.id, { 
-        completed: !todayEntry.completed,
-        value: !todayEntry.completed ? habit.target : 0
-      });
-    } else {
-      // Create new entry
-      await createEntry({
-        habitId: habit.id,
-        date: today,
-        completed: true,
-        value: habit.target
-      });
+      if (entryForSelectedDate) {
+        // Toggle existing entry
+        const newCompletedState = !entryForSelectedDate.completed;
+        await updateEntry(entryForSelectedDate.id, { 
+          completed: newCompletedState,
+          value: newCompletedState ? habit.target : 0
+        });
+      } else {
+        // Create new entry
+        await createEntry({
+          habitId: habit.id,
+          date: targetDate,
+          completed: true,
+          value: habit.target
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling habit:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to update habit: ${errorMessage}`);
+    } finally {
+      setTogglingHabitId(null);
     }
   };
 
   const getHabitProgress = (habit: any) => {
-    const habitEntries = entries.filter(entry => entry.habitId === habit.id);
+    const habitEntries = entries.filter(entry => String(entry.habitId) === String(habit.id));
     const completedEntries = habitEntries.filter(entry => entry.completed);
     
     if (habit.frequency === 'daily') {
@@ -112,42 +132,93 @@ export default function HabitsPage() {
     return 0;
   };
 
-  const getTodayEntry = (habit: any) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const getEntryForSelectedDate = (habit: any) => {
+    const targetDate = new Date(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
     
-    return entries.find(entry => 
-      entry.habitId === habit.id && 
-      new Date(entry.date).toDateString() === today.toDateString()
-    );
+    return entries.find(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return String(entry.habitId) === String(habit.id) && 
+             entryDate.toDateString() === targetDate.toDateString();
+    });
   };
 
-  const getStreakDays = (habit: any) => {
+  // Calculate current streak (consecutive days from today/yesterday going backwards)
+  const getCurrentStreak = (habit: any) => {
     const habitEntries = entries
-      .filter(entry => entry.habitId === habit.id && entry.completed)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .filter(entry => String(entry.habitId) === String(habit.id) && entry.completed)
+      .map(entry => {
+        const date = new Date(entry.date);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      })
+      .sort((a, b) => b.getTime() - a.getTime()); // Sort descending (newest first)
     
     if (habitEntries.length === 0) return 0;
     
-    let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    for (let i = 0; i < habitEntries.length; i++) {
-      const entryDate = new Date(habitEntries[i].date);
-      entryDate.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if the most recent entry is today or yesterday
+    const mostRecentEntry = habitEntries[0];
+    const daysDiff = Math.floor((today.getTime() - mostRecentEntry.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // If the last completion was more than 1 day ago, streak is broken
+    if (daysDiff > 1) return 0;
+    
+    // Count consecutive days
+    let streak = 1;
+    for (let i = 1; i < habitEntries.length; i++) {
+      const currentDate = habitEntries[i];
+      const previousDate = habitEntries[i - 1];
       
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - i);
+      const diffDays = Math.floor((previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      if (entryDate.getTime() === expectedDate.getTime()) {
+      if (diffDays === 1) {
         streak++;
       } else {
-        break;
+        break; // Streak is broken
       }
     }
     
     return streak;
+  };
+
+  // Calculate the longest streak ever (best streak)
+  const getBestStreak = (habit: any) => {
+    const habitEntries = entries
+      .filter(entry => String(entry.habitId) === String(habit.id) && entry.completed)
+      .map(entry => {
+        const date = new Date(entry.date);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      })
+      .sort((a, b) => a.getTime() - b.getTime()); // Sort ascending (oldest first)
+    
+    if (habitEntries.length === 0) return 0;
+    
+    let maxStreak = 1;
+    let currentStreak = 1;
+    
+    for (let i = 1; i < habitEntries.length; i++) {
+      const currentDate = habitEntries[i];
+      const previousDate = habitEntries[i - 1];
+      
+      const diffDays = Math.floor((currentDate.getTime() - previousDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentStreak++;
+        maxStreak = Math.max(maxStreak, currentStreak);
+      } else {
+        currentStreak = 1; // Reset streak
+      }
+    }
+    
+    return maxStreak;
   };
 
   return (
@@ -160,29 +231,7 @@ export default function HabitsPage() {
             <p className="text-gray-600 mt-1">Build positive routines and track your progress</p>
           </div>
           <div className="flex items-center space-x-3">
-            {/* View Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'list' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                List
-              </button>
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'calendar' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Calendar
-              </button>
-            </div>
+
             
             <button
               onClick={() => setShowCreateModal(true)}
@@ -228,7 +277,7 @@ export default function HabitsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Best Streak</p>
               <p className="text-2xl font-bold text-gray-900">
-                {Math.max(...habits.map(habit => habit.bestStreak), 0)}
+                {Math.max(...habits.map(habit => getBestStreak(habit)), 0)}
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
@@ -240,11 +289,11 @@ export default function HabitsPage() {
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Completed Today</p>
+              <p className="text-sm font-medium text-gray-600">Completed on {format(selectedDate, 'MMM d')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {habits.filter(habit => {
-                  const todayEntry = getTodayEntry(habit);
-                  return todayEntry && todayEntry.completed;
+                  const entry = getEntryForSelectedDate(habit);
+                  return entry && entry.completed;
                 }).length}
               </p>
             </div>
@@ -253,6 +302,33 @@ export default function HabitsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Date Navigator */}
+      <div className="flex items-center justify-center space-x-4 my-8">
+        <button
+          onClick={() => {
+            const newDate = new Date(selectedDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setSelectedDate(newDate);
+          }}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <span className="text-lg font-semibold text-gray-800">
+          {format(selectedDate, 'MMMM d, yyyy')}
+        </span>
+        <button
+          onClick={() => {
+            const newDate = new Date(selectedDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setSelectedDate(newDate);
+          }}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-600" />
+        </button>
       </div>
 
       {/* Habits List */}
@@ -273,101 +349,84 @@ export default function HabitsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
             {habits.map((habit) => {
-              const todayEntry = getTodayEntry(habit);
-              const isCompletedToday = todayEntry && todayEntry.completed;
-              const progress = getHabitProgress(habit);
-              const streak = getStreakDays(habit);
+              const entryForSelectedDate = getEntryForSelectedDate(habit);
+              const isCompleted = entryForSelectedDate && entryForSelectedDate.completed;
+              const currentStreak = getCurrentStreak(habit);
+              const bestStreak = getBestStreak(habit);
               
               return (
-                <div key={habit.id} className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div 
-                        className="w-10 h-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${habit.color}20` }}
-                      >
-                        <Target className="w-5 h-5" style={{ color: habit.color }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{habit.title}</h3>
-                        <p className="text-sm text-gray-500">{habit.frequency}</p>
-                      </div>
+                <div key={habit.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${habit.color}20` }}
+                    >
+                      <Target className="w-5 h-5" style={{ color: habit.color }} />
                     </div>
-                    
-                    <div className="flex items-center space-x-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{habit.title}</h3>
+                      <p className="text-sm text-gray-500">{habit.frequency}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1 text-sm text-gray-600">
+                      <Flame className="w-4 h-4 text-orange-500" />
+                      <span>{currentStreak} day streak</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-sm text-gray-600">
+                      <Award className="w-4 h-4 text-yellow-500" />
+                      <span>Best: {bestStreak}</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleHabit(habit)}
+                      disabled={togglingHabitId === habit.id}
+                      className={`w-40 flex items-center justify-center space-x-2 py-2 rounded-lg font-medium transition-colors ${
+                        togglingHabitId === habit.id
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : isCompleted
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {togglingHabitId === habit.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                          <span>Updating...</span>
+                        </>
+                      ) : isCompleted ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5" />
+                          <span>Completed</span>
+                        </>
+                      ) : (
+                        <>
+                          <Circle className="w-5 h-5" />
+                          <span>Mark Complete</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="flex items-center space-x-1">
                       <button
                         onClick={() => setEditingHabit(habit)}
-                        className="p-1 text-gray-400 hover:text-gray-600"
+                        className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
                         title="Edit habit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteHabit(habit.id)}
-                        className="p-1 text-gray-400 hover:text-red-600"
+                        className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
                         title="Delete habit"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-
-                  {habit.description && (
-                    <p className="text-gray-600 text-sm mb-4">{habit.description}</p>
-                  )}
-
-                  {/* Progress Bar */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                      <span>Progress</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${progress}%`,
-                          backgroundColor: habit.color
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                    <div className="flex items-center space-x-1">
-                      <Flame className="w-4 h-4 text-orange-500" />
-                      <span>{streak} day streak</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Award className="w-4 h-4 text-yellow-500" />
-                      <span>Best: {habit.bestStreak}</span>
-                    </div>
-                  </div>
-
-                  {/* Today's Action */}
-                  <button
-                    onClick={() => handleToggleHabit(habit)}
-                    className={`w-full flex items-center justify-center space-x-2 py-3 rounded-lg font-medium transition-colors ${
-                      isCompletedToday
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {isCompletedToday ? (
-                      <>
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span>Completed Today</span>
-                      </>
-                    ) : (
-                      <>
-                        <Circle className="w-5 h-5" />
-                        <span>Mark Complete</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               );
             })}

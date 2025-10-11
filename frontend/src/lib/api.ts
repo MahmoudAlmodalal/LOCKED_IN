@@ -136,6 +136,28 @@ class ApiClient {
     return this.request(`/habits/${id}`, { method: "DELETE" });
   }
 
+  async getHabitEntries(habitId?: string) {
+    return this.request(`/habit-entries${habitId ? `?habit_id=${habitId}` : ''}`);
+  }
+
+  async createHabitEntry(data: any) {
+    return this.request("/habit-entries", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHabitEntry(id: string, data: any) {
+    return this.request(`/habit-entries/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteHabitEntry(id: string) {
+    return this.request(`/habit-entries/${id}`, { method: "DELETE" });
+  }
+
   // -------------------------------
   // ✅ POMODORO SESSIONS ENDPOINTS
   // -------------------------------

@@ -151,7 +151,7 @@ export interface HabitEntry {
   habitId: string;
   date: Date;
   completed: boolean;
-  value: number; // actual value achieved
+  value?: number; // actual value achieved
   notes?: string;
   createdAt: Date;
 }
