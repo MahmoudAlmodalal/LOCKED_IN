@@ -67,4 +67,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(CalendarEvent::class);
     }
+
+    /**
+     * Get the habits for the user.
+     */
+    public function habits(): HasMany
+    {
+        return $this->hasMany(Habit::class);
+    }
+
+    /**
+     * Get the habit entries for the user.
+     */
+    public function habitEntries(): HasMany
+    {
+        return $this->hasMany(HabitEntry::class);
+    }
 }

@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('calendar-events', CalendarEventController::class);
     Route::apiResource('pomodoro-sessions', PomodoroSessionController::class);
     Route::apiResource('notifications', NotificationController::class)->except(['store', 'show']);
+    Route::apiResource('habit-entries', \App\Http\Controllers\HabitEntryController::class);
 
     // Add other future protected routes here...
     // e.g., Route::apiResource('/tasks', TaskController::class);
