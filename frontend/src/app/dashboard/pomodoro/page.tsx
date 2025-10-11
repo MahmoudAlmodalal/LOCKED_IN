@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { usePomodoroSessions, useTasks } from '@/lib/hooks';
+import { usePomodoroSessions, useAuth } from '@/lib/hooks';
 import { 
   Play, 
   Pause, 
@@ -11,14 +11,14 @@ import {
   CheckCircle2,
   Target,
   Coffee,
-  RotateCcw
+  ArrowRight
 } from 'lucide-react';
 import { formatDuration } from '@/lib/utils';
 import { PomodoroType } from '@/lib/types';
 
 export default function PomodoroPage() {
-  const { sessions, createSession, updateSession } = usePomodoroSessions();
-  const { tasks } = useTasks();
+  const { sessions, createSession, refreshSessions } = usePomodoroSessions();
+  const { user } = useAuth();
   
   const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
   const [isRunning, setIsRunning] = useState(false);
@@ -35,16 +35,47 @@ export default function PomodoroPage() {
     workDuration: 25,
     shortBreakDuration: 5,
     longBreakDuration: 15,
-    longBreakInterval: 4,
+    longBreakInterval: 3, // After 3 work sessions, take a long break
     autoStartBreaks: false,
     autoStartPomodoros: false,
     soundEnabled: true
   });
 
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    if (user?.id) {
+      const savedSettings = localStorage.getItem(`pomodoro_settings_${user.id}`);
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          setSettings(parsed);
+          // Update timer with saved work duration
+          setTimeLeft(parsed.workDuration * 60);
+        } catch (error) {
+          console.error('Failed to load settings:', error);
+        }
+      }
+    }
+  }, [user?.id]);
+
+  // Save settings to localStorage
+  const saveSettings = (newSettings: typeof settings) => {
+    if (user?.id) {
+      localStorage.setItem(`pomodoro_settings_${user.id}`, JSON.stringify(newSettings));
+      setSettings(newSettings);
+    }
+  };
+
   // Initialize audio
   useEffect(() => {
-    audioRef.current = new Audio('/notification.mp3'); // You would need to add this audio file
-    audioRef.current.volume = 0.5;
+    // Only initialize audio if the file exists to avoid console errors
+    // You can add a notification.mp3 file to the public folder later
+    try {
+      audioRef.current = new Audio('/notification.mp3');
+      audioRef.current.volume = 0.5;
+    } catch (error) {
+      console.log('Audio notification not available');
+    }
   }, []);
 
   // Timer logic
@@ -78,16 +109,17 @@ export default function PomodoroPage() {
     
     // Play notification sound
     if (settings.soundEnabled && audioRef.current) {
-      audioRef.current.play().catch(console.error);
-    }
-
-    // Update current session
-    if (currentSession) {
-      await updateSession(currentSession.id, {
-        endTime: new Date(),
-        completed: true
+      audioRef.current.play().catch((error) => {
+        // Silently fail if audio can't play (file doesn't exist or user hasn't interacted with page)
+        console.log('Audio notification not available:', error.message);
       });
     }
+
+    // Refresh sessions to update the counter
+    await refreshSessions();
+    
+    // Mark session as complete in local state
+    setCurrentSession(null);
 
     // Show completion notification
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -103,10 +135,14 @@ export default function PomodoroPage() {
 
     // Determine next phase
     if (currentType === PomodoroType.WORK) {
-      setSessionCount(prev => prev + 1);
-      const nextType = sessionCount + 1 >= settings.longBreakInterval 
+      const newCount = sessionCount + 1;
+      setSessionCount(newCount);
+      
+      // After 3 work sessions, take a long break. Otherwise, short break.
+      const nextType = newCount % 3 === 0 
         ? PomodoroType.LONG_BREAK 
         : PomodoroType.SHORT_BREAK;
+      
       setCurrentType(nextType);
       setTimeLeft((nextType === PomodoroType.LONG_BREAK ? settings.longBreakDuration : settings.shortBreakDuration) * 60);
       
@@ -114,6 +150,7 @@ export default function PomodoroPage() {
         startTimer();
       }
     } else {
+      // After any break (short or long), go back to work
       setCurrentType(PomodoroType.WORK);
       setTimeLeft(settings.workDuration * 60);
       
@@ -127,12 +164,26 @@ export default function PomodoroPage() {
     if (!isRunning) {
       // Create new session if starting
       if (!currentSession) {
-        const newSession = await createSession({
-          type: currentType,
-          duration: timeLeft,
-          startTime: new Date()
-        });
-        setCurrentSession(newSession);
+        try {
+          // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
+          const now = new Date();
+          const mysqlDateTime = now.getFullYear() + '-' + 
+            String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+            String(now.getDate()).padStart(2, '0') + ' ' + 
+            String(now.getHours()).padStart(2, '0') + ':' + 
+            String(now.getMinutes()).padStart(2, '0') + ':' + 
+            String(now.getSeconds()).padStart(2, '0');
+          
+          const newSession = await createSession({
+            type: currentType,
+            duration: timeLeft,
+            start_time: mysqlDateTime
+          });
+          setCurrentSession(newSession);
+        } catch (error) {
+          console.error('Failed to create session:', error);
+          // Continue anyway - we can still track locally
+        }
       }
       setIsRunning(true);
     }
@@ -305,8 +356,9 @@ export default function PomodoroPage() {
                 <button
                   onClick={skipPhase}
                   className="bg-blue-600 text-white p-4 rounded-full hover:bg-blue-700 transition-colors shadow-lg"
+                  title="Skip to next phase"
                 >
-                  <RotateCcw className="w-6 h-6" />
+                  <ArrowRight className="w-6 h-6" />
                 </button>
               </div>
             </div>
@@ -326,8 +378,11 @@ export default function PomodoroPage() {
                     <span className="text-gray-700">Work Sessions</span>
                   </div>
                   <span className="font-semibold text-gray-900">
-                    {sessions.filter(s => s.type === PomodoroType.WORK && 
-                      new Date(s.startTime).toDateString() === new Date().toDateString()).length}
+                    {sessions.filter(s => {
+                      const startTime = (s as any).start_time || s.startTime;
+                      return s.type === PomodoroType.WORK && 
+                        new Date(startTime).toDateString() === new Date().toDateString();
+                    }).length}
                   </span>
                 </div>
                 
@@ -339,8 +394,11 @@ export default function PomodoroPage() {
                     <span className="text-gray-700">Short Breaks</span>
                   </div>
                   <span className="font-semibold text-gray-900">
-                    {sessions.filter(s => s.type === PomodoroType.SHORT_BREAK && 
-                      new Date(s.startTime).toDateString() === new Date().toDateString()).length}
+                    {sessions.filter(s => {
+                      const startTime = (s as any).start_time || s.startTime;
+                      return s.type === PomodoroType.SHORT_BREAK && 
+                        new Date(startTime).toDateString() === new Date().toDateString();
+                    }).length}
                   </span>
                 </div>
                 
@@ -352,29 +410,13 @@ export default function PomodoroPage() {
                     <span className="text-gray-700">Long Breaks</span>
                   </div>
                   <span className="font-semibold text-gray-900">
-                    {sessions.filter(s => s.type === PomodoroType.LONG_BREAK && 
-                      new Date(s.startTime).toDateString() === new Date().toDateString()).length}
+                    {sessions.filter(s => {
+                      const startTime = (s as any).start_time || s.startTime;
+                      return s.type === PomodoroType.LONG_BREAK && 
+                        new Date(startTime).toDateString() === new Date().toDateString();
+                    }).length}
                   </span>
                 </div>
-              </div>
-            </div>
-
-            {/* Quick Tasks */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Tasks</h3>
-              <div className="space-y-3">
-                {tasks.filter(task => task.status !== 'Done').slice(0, 3).map(task => (
-                  <div key={task.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className={`w-3 h-3 rounded-full ${
-                      task.priority === 'High' ? 'bg-orange-500' :
-                      task.priority === 'Medium' ? 'bg-yellow-500' : 'bg-gray-400'
-                    }`}></div>
-                    <span className="text-sm text-gray-700 flex-1 truncate">{task.title}</span>
-                  </div>
-                ))}
-                {tasks.filter(task => task.status !== 'Done').length === 0 && (
-                  <p className="text-gray-500 text-sm">No pending tasks</p>
-                )}
               </div>
             </div>
 
@@ -409,7 +451,7 @@ export default function PomodoroPage() {
           settings={settings}
           onClose={() => setShowSettings(false)}
           onSave={(newSettings: any) => {
-            setSettings(newSettings);
+            saveSettings(newSettings);
             setShowSettings(false);
             // Reset timer with new settings
             setTimeLeft(newSettings.workDuration * 60);
