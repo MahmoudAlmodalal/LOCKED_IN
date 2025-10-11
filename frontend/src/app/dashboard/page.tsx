@@ -187,7 +187,10 @@ export default function DashboardPage() {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Recent Tasks</h2>
-                  <button className="flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  <button 
+                    onClick={() => router.push('/dashboard/tasks')}
+                    className="flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
                     <Plus className="w-4 h-4 mr-1" />
                     Add Task
                   </button>
@@ -202,14 +205,21 @@ export default function DashboardPage() {
                   <div className="text-center py-8">
                     <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-500 mb-4">No tasks yet</p>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                    <button 
+                      onClick={() => router.push('/dashboard/tasks')}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
                       Create your first task
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {tasks.slice(0, 5).map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div 
+                        key={task.id} 
+                        onClick={() => router.push('/dashboard/tasks')}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                      >
                         <div className="flex items-center space-x-3">
                           <div className={`w-3 h-3 rounded-full ${
                             task.status === 'Done' ? 'bg-green-500' : 
@@ -240,7 +250,10 @@ export default function DashboardPage() {
                     ))}
                     {tasks.length > 5 && (
                       <div className="text-center pt-4">
-                        <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                        <button 
+                          onClick={() => router.push('/dashboard/tasks')}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
                           View all {tasks.length} tasks
                         </button>
                       </div>
@@ -258,7 +271,10 @@ export default function DashboardPage() {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Habits</h2>
-                  <button className="flex items-center text-green-600 hover:text-green-700 text-sm font-medium">
+                  <button 
+                    onClick={() => router.push('/dashboard/habits')}
+                    className="flex items-center text-green-600 hover:text-green-700 text-sm font-medium"
+                  >
                     <Plus className="w-4 h-4 mr-1" />
                     Add Habit
                   </button>
@@ -273,7 +289,10 @@ export default function DashboardPage() {
                   <div className="text-center py-8">
                     <Target className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-500 mb-4">No habits yet</p>
-                    <button className="text-green-600 hover:text-green-700 text-sm font-medium">
+                    <button 
+                      onClick={() => router.push('/dashboard/habits')}
+                      className="text-green-600 hover:text-green-700 text-sm font-medium"
+                    >
                       Create your first habit
                     </button>
                   </div>
@@ -281,23 +300,32 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     {habits.slice(0, 3).map((habit) => (
                       <div key={habit.id} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
+                        <div 
+                          className="flex items-center space-x-3 flex-1 cursor-pointer"
+                          onClick={() => router.push('/dashboard/habits')}
+                        >
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
                             <Target className="w-4 h-4 text-gray-600" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{habit.title}</p>
-                            <p className="text-sm text-gray-500">{habit.streak} day streak</p>
+                            <p className="text-sm text-gray-500">{habit.streak || 0} day streak</p>
                           </div>
                         </div>
-                        <button className="w-6 h-6 border-2 border-gray-300 rounded hover:border-green-500 hover:bg-green-50 transition-colors">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 hidden" />
+                        <button 
+                          onClick={() => router.push('/dashboard/habits')}
+                          className="w-8 h-8 border-2 border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors flex items-center justify-center"
+                        >
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                         </button>
                       </div>
                     ))}
                     {habits.length > 3 && (
                       <div className="text-center pt-4">
-                        <button className="text-green-600 hover:text-green-700 text-sm font-medium">
+                        <button 
+                          onClick={() => router.push('/dashboard/habits')}
+                          className="text-green-600 hover:text-green-700 text-sm font-medium"
+                        >
                           View all {habits.length} habits
                         </button>
                       </div>
@@ -314,7 +342,10 @@ export default function DashboardPage() {
               </div>
               <div className="p-6">
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => router.push('/dashboard/pomodoro')}
+                    className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                  >
                     <div className="flex items-center space-x-3">
                       <CheckSquare className="w-5 h-5 text-blue-600" />
                       <span className="font-medium text-blue-900">Start Pomodoro</span>
@@ -322,7 +353,10 @@ export default function DashboardPage() {
                     <Clock className="w-4 h-4 text-blue-600" />
                   </button>
                   
-                  <button className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => router.push('/dashboard/habits')}
+                    className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                  >
                     <div className="flex items-center space-x-3">
                       <Target className="w-5 h-5 text-green-600" />
                       <span className="font-medium text-green-900">Log Habit</span>
@@ -330,7 +364,10 @@ export default function DashboardPage() {
                     <Plus className="w-4 h-4 text-green-600" />
                   </button>
                   
-                  <button className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => router.push('/dashboard/calendar')}
+                    className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                  >
                     <div className="flex items-center space-x-3">
                       <Calendar className="w-5 h-5 text-purple-600" />
                       <span className="font-medium text-purple-900">View Calendar</span>
@@ -338,7 +375,10 @@ export default function DashboardPage() {
                     <ArrowRight className="w-4 h-4 text-purple-600" />
                   </button>
                   
-                  <button className="w-full flex items-center justify-between p-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => router.push('/dashboard/reports')}
+                    className="w-full flex items-center justify-between p-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                  >
                     <div className="flex items-center space-x-3">
                       <BarChart3 className="w-5 h-5 text-orange-600" />
                       <span className="font-medium text-orange-900">View Reports</span>
